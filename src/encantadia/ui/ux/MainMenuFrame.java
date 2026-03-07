@@ -1,5 +1,9 @@
 package encantadia.ui.ux;
 
+import encantadia.ui.ux.gamemodeselection.ArcadeMode;
+import encantadia.ui.ux.gamemodeselection.PVEMode;
+import encantadia.ui.ux.gamemodeselection.PVPMode;
+
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -9,6 +13,7 @@ public class MainMenuFrame extends JFrame {
     private JButton arcadeButton;
     private JButton PVPButton;
     private JButton PVEButton;
+    private JButton exitGameButton;
 
 
     public MainMenuFrame() {
@@ -18,11 +23,45 @@ public class MainMenuFrame extends JFrame {
         setSize(1024, 768);
         setLocationRelativeTo(null);
         setVisible(true);
+
+
+        // Button Sides
         arcadeButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JOptionPane.showMessageDialog(MainMenuFrame.this, "Hello all my niggas say what");
+
+                new ArcadeMode();
+                dispose();
+            }
+        });
+
+
+        PVPButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+                new PVPMode();
+                dispose();
+            }
+        });
+
+
+        PVEButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+                new PVEMode();
+                dispose();
+            }
+        });
+
+
+        exitGameButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                System.exit(0);
             }
         });
     }
+
 }

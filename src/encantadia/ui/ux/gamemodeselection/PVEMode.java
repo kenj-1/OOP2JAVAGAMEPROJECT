@@ -2,12 +2,12 @@ package encantadia.ui.ux.gamemodeselection;
 
 import javax.swing.*;
 
-public class ArcadeMode extends JFrame {
-    private JPanel ArcadeModepanel;
+public class PVEMode extends JFrame {
 
+    private JPanel PVEModepanel;
 
-    public ArcadeMode() {
-        setContentPane(ArcadeModepanel);
+    public PVEMode() {
+        setContentPane(PVEModepanel);
         setTitle("Encantadia: Echoes of the Gem - Arcade Mode");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1024, 768);
