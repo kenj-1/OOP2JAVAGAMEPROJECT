@@ -1,34 +1,29 @@
 package encantadia.ui.ux;
 
 import javax.swing.*;
-import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
-public class MainMenuFrame {
+public class MainMenuFrame extends JFrame {
+    private JPanel MainMenuFramePanel;
+    private JTextField textField1;
+    private JButton niggaButton;
+    private JButton PVPButton;
+    private JButton PVEButton;
 
-    public void showMainMenu() {
 
-        JFrame frame = new JFrame("Main Menu");
-
-        JPanel panel = new JPanel();
-        panel.setLayout(new GridBagLayout());
-
-        JPanel menuPanel = new JPanel();
-        menuPanel.setLayout(new GridLayout(3, 1, 10, 10));
-
-        JButton start = new JButton("Start Game");
-        JButton settings = new JButton("Settings");
-        JButton exit = new JButton("Exit");
-
-        menuPanel.add(start);
-        menuPanel.add(settings);
-        menuPanel.add(exit);
-
-        panel.add(menuPanel);
-
-        frame.add(panel);
-        frame.setSize(400, 300);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
+    public MainMenuFrame() {
+        setContentPane(MainMenuFramePanel);
+        setTitle("Encantadia: Echoes of the Gem - Main Menu");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(300, 300);
+        setLocationRelativeTo(null);
+        setVisible(true);
+        niggaButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JOptionPane.showMessageDialog(MainMenuFrame.this, "Hello all my niggas say what");
+            }
+        });
     }
 }
