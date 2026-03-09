@@ -11,7 +11,11 @@ public class Mary extends Character {
                 "Goddess of Tides",
                 5000,
                 "Born of moon and sea, Mary governs rhythm and balance. " +
-                        "She feels Joygen's absence as a broken tide—an imbalance that threatens to drown Encantadia itself."
+                        """
+                                She feels Joygen's absence as a broken tide—an imbalance that threatens to drown Encantadia itself.
+                                
+                                
+                                """
         );
 
         // Skill 1: Luha — no effect

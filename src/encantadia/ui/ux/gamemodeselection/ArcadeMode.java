@@ -1,6 +1,8 @@
 package encantadia.ui.ux.gamemodeselection;
 
+import encantadia.ui.ux.CharacterSelectionFrame;
 import encantadia.ui.ux.MainMenuFrame;
+import encantadia.ui.ux.CharacterSelectionFrame;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;
@@ -10,7 +12,6 @@ public class ArcadeMode extends JFrame {
 
     private JPanel arcadeModePanel;
     private JButton backToMainMenuButton;
-    private JLabel arcadeLabel;
     private JButton noButton;
     private JButton yesButton;
 
@@ -37,7 +38,10 @@ public class ArcadeMode extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 JOptionPane.showMessageDialog(ArcadeMode.this,
                         "Arcade Mode Starting...");
+                new CharacterSelectionFrame();
+                dispose();
             }
+
         });
 
         // NO button
