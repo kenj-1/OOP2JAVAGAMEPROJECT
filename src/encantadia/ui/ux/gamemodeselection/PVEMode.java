@@ -10,9 +10,6 @@ public class PVEMode extends JFrame {
 
     public PVEMode() {
 
-        panel = new JPanel();
-
-
 
         setContentPane(panel);
         setTitle("Encantadia: Echoes of the Gem - PVE Mode");
