@@ -26,7 +26,17 @@ Encantadia-Origins/
 │       │   ├── BattleFrame.java
 │       │   ├── CharacterSelectFrame.java
 │       │   └── ResultDialog.java
-│       │
+│       │   └── gamemodeselection/
+│       │       ├── ArcadeMode/
+│       │       │   └──ArcadeMode.class
+│       │       │   └──ArcadeMode.form  
+│       │       ├── PVEMode/
+│       │       │    └── PVEMode.java
+│       │       │    └── PVEMode.form
+│       │       │
+│       │       └── PVPMode/
+│       │           └── PVPMode.java
+│       │           └── PVPMode.form
 │       ├── characters/
 │       │   ├── Character.java
 │       │   ├── Mary.java
@@ -44,6 +54,8 @@ Encantadia-Origins/
 │           ├── Dice.java
 │           ├── InputValidator.java
 │           └── Constants.java
+│       
+│       
 │
 └── assets/
     └── images/

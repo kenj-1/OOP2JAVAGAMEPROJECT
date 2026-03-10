@@ -37,6 +37,13 @@ public class CharacterSelectionFrame extends JFrame {
         Image img = icon.getImage().getScaledInstance(50, 50, Image.SCALE_SMOOTH);
 
         labelDirk.setIcon(new ImageIcon(img));
+        labelMary.setIcon(new ImageIcon(img));
+        labelMakelanShere.setIcon(new ImageIcon(img));
+        labelTyrone.setIcon(new ImageIcon(img));
+        labelDea.setIcon(new ImageIcon(img));
+        labelFlamara.setIcon(new ImageIcon(img));
+        labelTera.setIcon(new ImageIcon(img));
+        labelAdamus.setIcon(new ImageIcon(img));
 
         setVisible(true);
 
