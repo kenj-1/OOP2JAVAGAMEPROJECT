@@ -23,6 +23,7 @@ public class BattleFrame extends JFrame {
     private JLabel roundTitle;
 
     private JPanel battleFramePanel;
+    private JLabel invokingOfSkills;
 
     private Character playerCharacter;
     private Character enemyCharacter;
