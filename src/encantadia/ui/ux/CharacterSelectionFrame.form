@@ -1,48 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <form xmlns="http://www.intellij.com/uidesigner/form/" version="1" bind-to-class="encantadia.ui.ux.CharacterSelectionFrame">
-  <grid id="27dc6" binding="characterSelectionFrame" layout-manager="GridLayoutManager" row-count="4" column-count="6" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+  <grid id="27dc6" binding="characterSelectionFrame" layout-manager="GridLayoutManager" row-count="8" column-count="6" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
     <margin top="0" left="0" bottom="0" right="0"/>
     <constraints>
-      <xy x="96" y="54" width="2511" height="1287"/>
+      <xy x="96" y="54" width="2559" height="1387"/>
     </constraints>
     <properties/>
     <border type="none"/>
     <children>
-      <component id="c525c" class="javax.swing.JButton" binding="button5" default-binding="true">
+      <component id="c525c" class="javax.swing.JButton" binding="selectAdamus">
         <constraints>
-          <grid row="3" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+          <grid row="7" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <text value="Button"/>
         </properties>
       </component>
-      <component id="5d095" class="javax.swing.JButton" binding="button6" default-binding="true">
+      <component id="5d095" class="javax.swing.JButton" binding="selectTera">
         <constraints>
-          <grid row="3" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+          <grid row="7" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <text value="Button"/>
         </properties>
       </component>
-      <component id="fc6b8" class="javax.swing.JButton" binding="button7" default-binding="true">
+      <component id="fc6b8" class="javax.swing.JButton" binding="selectFlamara">
         <constraints>
-          <grid row="3" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+          <grid row="7" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <text value="Button"/>
         </properties>
       </component>
-      <component id="df30f" class="javax.swing.JButton" binding="button8" default-binding="true">
+      <component id="df30f" class="javax.swing.JButton" binding="selectDea">
+        <constraints>
+          <grid row="7" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Button"/>
+        </properties>
+      </component>
+      <component id="5c97a" class="javax.swing.JButton" binding="selectDirk">
         <constraints>
           <grid row="3" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
-        </constraints>
-        <properties>
-          <text value="Button"/>
-        </properties>
-      </component>
-      <component id="5c97a" class="javax.swing.JButton" binding="button1" default-binding="true">
-        <constraints>
-          <grid row="1" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <text value="Button"/>
@@ -58,25 +58,25 @@
           <grid row="0" column="5" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
       </hspacer>
-      <component id="3d720" class="javax.swing.JButton" binding="button3" default-binding="true">
+      <component id="3d720" class="javax.swing.JButton" binding="selectMary">
         <constraints>
-          <grid row="1" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+          <grid row="3" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <text value="Button"/>
         </properties>
       </component>
-      <component id="13c72" class="javax.swing.JButton" binding="button4" default-binding="true">
+      <component id="13c72" class="javax.swing.JButton" binding="selectMakelanShere">
         <constraints>
-          <grid row="1" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+          <grid row="3" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <text value="Button"/>
         </properties>
       </component>
-      <component id="2d790" class="javax.swing.JButton" binding="button2" default-binding="true">
+      <component id="2d790" class="javax.swing.JButton" binding="selectTyrone">
         <constraints>
-          <grid row="1" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+          <grid row="3" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <text value="Button"/>
@@ -102,7 +102,7 @@
       </component>
       <component id="a90a" class="javax.swing.JLabel" binding="labelDea">
         <constraints>
-          <grid row="2" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+          <grid row="4" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <icon value="assets/Portrait_Placeholder.png"/>
@@ -111,7 +111,7 @@
       </component>
       <component id="cca30" class="javax.swing.JLabel" binding="labelTera">
         <constraints>
-          <grid row="2" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+          <grid row="4" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <icon value="assets/Portrait_Placeholder.png"/>
@@ -120,7 +120,7 @@
       </component>
       <component id="6f612" class="javax.swing.JLabel" binding="labelFlamara">
         <constraints>
-          <grid row="2" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+          <grid row="4" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <icon value="assets/Portrait_Placeholder.png"/>
@@ -129,7 +129,7 @@
       </component>
       <component id="17330" class="javax.swing.JLabel" binding="labelAdamus">
         <constraints>
-          <grid row="2" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+          <grid row="4" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <icon value="assets/Portrait_Placeholder.png"/>
@@ -152,6 +152,134 @@
         <properties>
           <icon value="assets/Portrait_Placeholder.png"/>
           <text value=""/>
+        </properties>
+      </component>
+      <component id="eeac7" class="javax.swing.JLabel" binding="dirkCharacter">
+        <constraints>
+          <grid row="1" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Dirk"/>
+        </properties>
+      </component>
+      <component id="70985" class="javax.swing.JLabel" binding="maryCharacter">
+        <constraints>
+          <grid row="1" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Mary"/>
+        </properties>
+      </component>
+      <component id="61e8a" class="javax.swing.JLabel" binding="makelanShereCharacter">
+        <constraints>
+          <grid row="1" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Makelan Shere"/>
+        </properties>
+      </component>
+      <component id="6f9fe" class="javax.swing.JLabel" binding="tyroneCharacter">
+        <constraints>
+          <grid row="1" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Tyrone"/>
+        </properties>
+      </component>
+      <component id="4ba42" class="javax.swing.JLabel" binding="flamaraCharacter">
+        <constraints>
+          <grid row="5" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Flamara"/>
+        </properties>
+      </component>
+      <component id="8ae07" class="javax.swing.JLabel" binding="adamusCharacter">
+        <constraints>
+          <grid row="5" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Adamus"/>
+        </properties>
+      </component>
+      <component id="57144" class="javax.swing.JLabel" binding="teraCharacter">
+        <constraints>
+          <grid row="5" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Tera"/>
+        </properties>
+      </component>
+      <component id="5876c" class="javax.swing.JLabel" binding="deaCharacter">
+        <constraints>
+          <grid row="5" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Dea"/>
+        </properties>
+      </component>
+      <component id="d47b6" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="2" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Health : 5000HP | Ultimate Effect : Reduces enemy damage by 65% next turn"/>
+        </properties>
+      </component>
+      <component id="881f" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="2" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Health : 5000HP | Ultimate Effect : 50% chance to steal a turn"/>
+        </properties>
+      </component>
+      <component id="825f6" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="2" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Health : 5000HP | Ultimate Effect : Takes 15% recoil damage and reduces own damage by 30% for 2 turns"/>
+        </properties>
+      </component>
+      <component id="bd1d7" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="2" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Health : 5000HP | Ultimate Effect : Throws additional damage of 250"/>
+        </properties>
+      </component>
+      <component id="f36ea" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="6" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Health : 5000HP | Ultimate Effect : Has a 60% chance of increasing opponents' cooldown by 1 turn"/>
+        </properties>
+      </component>
+      <component id="6c9a3" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="6" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Health : 5000HP | Ultimate Effect : Throws additional damage of 300"/>
+        </properties>
+      </component>
+      <component id="6ad1" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="6" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Health : 5000HP | Ultimate Effect : Has a healing effect of 300 HP"/>
+        </properties>
+      </component>
+      <component id="69722" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="6" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Health : 5000HP | Ultimate Effect : Decreases all skill turns by 1, except skill 1"/>
         </properties>
       </component>
     </children>

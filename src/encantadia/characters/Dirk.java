@@ -21,7 +21,7 @@ public class Dirk extends Character {
                 Skill.EffectType.NONE, 0, 0));
 
         skills.add(new Skill("Linog", 500, 650, 3,
-                Skill.EffectType.DAMAGE_REDUCTION, 0.40, 1.0));
-        //                                         ^^^^ 40% reduction, 100% proc chance
+                Skill.EffectType.DAMAGE_REDUCTION, 0.65, 1.0));
+        //                                         ^^^^ 65% reduction, 100% proc chance
     }
 }

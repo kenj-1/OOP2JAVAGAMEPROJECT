@@ -1,5 +1,5 @@
 package encantadia.ui.ux;
-
+import encantadia.battle.EnemyFactory;
 
 import encantadia.characters.*;
 import encantadia.characters.Character;
@@ -11,14 +11,14 @@ import java.awt.*;        // ← add this
 public class CharacterSelectionFrame extends JFrame {
 
     private JPanel characterSelectionFrame;
-    private JButton button1;
-    private JButton button3;
-    private JButton button4;
-    private JButton button2;
-    private JButton button5;
-    private JButton button6;
-    private JButton button7;
-    private JButton button8;
+    private JButton selectDirk;
+    private JButton selectMary;
+    private JButton selectMakelanShere;
+    private JButton selectTyrone;
+    private JButton selectAdamus;
+    private JButton selectTera;
+    private JButton selectFlamara;
+    private JButton selectDea;
     private JLabel labelDirk;
     private JLabel labelMary;
     private JLabel labelMakelanShere;
@@ -27,6 +27,14 @@ public class CharacterSelectionFrame extends JFrame {
     private JLabel labelFlamara;
     private JLabel labelTera;
     private JLabel labelAdamus;
+    private JLabel dirkCharacter;
+    private JLabel maryCharacter;
+    private JLabel makelanShereCharacter;
+    private JLabel tyroneCharacter;
+    private JLabel deaCharacter;
+    private JLabel flamaraCharacter;
+    private JLabel teraCharacter;
+    private JLabel adamusCharacter;
 
 
     public CharacterSelectionFrame(){
@@ -36,9 +44,7 @@ public class CharacterSelectionFrame extends JFrame {
         setSize(1024, 768);
         setLocationRelativeTo(null);
 
-
         ImageIcon icon = new ImageIcon("src/assets/Portrait_Placeholder.png");
-
         Image img = icon.getImage().getScaledInstance(50, 50, Image.SCALE_SMOOTH);
 
         labelDirk.setIcon(new ImageIcon(img));
@@ -50,16 +56,18 @@ public class CharacterSelectionFrame extends JFrame {
         labelTera.setIcon(new ImageIcon(img));
         labelAdamus.setIcon(new ImageIcon(img));
 
-
-        button5.addActionListener(e -> {
-            Character selectedCharacter = new Dea();
-            showCharacterBackstory(selectedCharacter);
-        });
-
-
+        selectDirk.addActionListener(e -> showCharacterBackstory(new Dirk()));
+        selectTyrone.addActionListener(e -> showCharacterBackstory(new Tyrone()));
+        selectMary.addActionListener(e -> showCharacterBackstory(new Mary()));
+        selectMakelanShere.addActionListener(e -> showCharacterBackstory(new MakelanShere()));
+        selectAdamus.addActionListener(e -> showCharacterBackstory(new Adamus()));
+        selectTera.addActionListener(e -> showCharacterBackstory(new Tera()));
+        selectFlamara.addActionListener(e -> showCharacterBackstory(new Flamara()));
+        selectDea.addActionListener(e -> showCharacterBackstory(new Dea()));
 
         setVisible(true);
     }
+
 
     private void showCharacterBackstory(Character character) {
 
@@ -78,7 +86,21 @@ public class CharacterSelectionFrame extends JFrame {
 
         if(choice == JOptionPane.OK_OPTION){
 
-            new BattleFrame(character);
+            Character enemy = EnemyFactory.getRandomEnemy(character);
+
+            String enemyMessage =
+                    enemy.getName() + "\n" +
+                            enemy.getTitle() + "\n\n" +
+                            enemy.getBackstory();
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    enemyMessage,
+                    "Enemy Appears!",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            new BattleFrame(character, enemy);
 
             dispose();
         }

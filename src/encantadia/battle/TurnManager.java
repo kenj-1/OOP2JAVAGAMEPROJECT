@@ -50,7 +50,7 @@ public class TurnManager {
 
     // ── Public API ────────────────────────────────────────────
 
-    /**
+    /**d
      * Executes a skill for the attacker against the target.
      *
      * @param attacker   The character using the skill
@@ -168,13 +168,25 @@ public class TurnManager {
         result.log(healer.getName() + " restores " + baseValue + " HP"
                 + " | HP: " + healer.getCurrentHP() + "/" + healer.getMaxHP());
 
-        // Adamus's Tsunami Blast: COOLDOWN_REDUCTION — reduce own cooldowns by 1 (skip slot 0)
+        // Adamus's Tsunami Blast: reset cooldowns of other skills
         if (skill.getEffectType() == Skill.EffectType.COOLDOWN_REDUCTION && skill.effectTriggered()) {
-            int amount = (int) skill.getEffectValue();
-            cooldownManager.decreaseCooldowns(healer, amount);
+
+            for (int i = 0; i < healer.getSkills().size(); i++) {
+
+                if (i == skillIndex) {
+                    continue;
+                }
+
+                int remaining = cooldownManager.getRemainingCooldown(healer, i);
+
+                if (remaining > 0) {
+                    cooldownManager.setCooldown(healer, i, 0);
+                }
+            }
+
             result.effectTriggered(true);
-            result.effectDescription("Tidal flow restores skill energy — cooldowns reduced by " + amount + "!");
-            result.log(healer.getName() + "'s cooldowns drop by " + amount + " turn(s)!");
+            result.effectDescription("Tidal surge resets Adamus' skills!");
+            result.log("🌊 All other skill cooldowns are refreshed!");
         }
 
         cooldownManager.setCooldown(healer, skillIndex, skill.getCooldown());

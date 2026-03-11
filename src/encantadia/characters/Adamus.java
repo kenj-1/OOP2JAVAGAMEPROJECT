@@ -26,6 +26,6 @@ public class Adamus extends Character {
 
         // Skill 3: Tsunami Blast — heals ally, then reduces all skill cooldowns by 1 (except Skill 1)
         skills.add(new Skill("Tsunami Blast", 600, 650, 3,
-                Skill.SkillType.HEAL, Skill.EffectType.COOLDOWN_REDUCTION, 1, 1.0));
+                Skill.SkillType.DAMAGE, Skill.EffectType.COOLDOWN_REDUCTION, 1, 1.0));
     }
 }
