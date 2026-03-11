@@ -1,8 +1,8 @@
-package encantadia.ui.ux;
+package encantadia.ui.frames;
 
-import encantadia.ui.ux.gamemodeselection.ArcadeMode;
-import encantadia.ui.ux.gamemodeselection.PVEMode;
-import encantadia.ui.ux.gamemodeselection.PVPMode;
+import encantadia.gamemode.ArcadeMode;
+import encantadia.gamemode.PVEMode;
+import encantadia.gamemode.PVPMode;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;

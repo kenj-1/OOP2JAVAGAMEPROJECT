@@ -1,8 +1,7 @@
-package encantadia.ui.ux.gamemodeselection;
+package encantadia.gamemode;
 
-import encantadia.ui.ux.CharacterSelectionFrame;
-import encantadia.ui.ux.MainMenuFrame;
-import encantadia.ui.ux.CharacterSelectionFrame;
+import encantadia.ui.frames.CharacterSelectionFrame;
+import encantadia.ui.frames.MainMenuFrame;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;

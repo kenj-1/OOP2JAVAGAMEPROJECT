@@ -1,4 +1,4 @@
-package encantadia.battle;
+package encantadia.battle.result;
 
 import java.util.ArrayList;
 import java.util.List;

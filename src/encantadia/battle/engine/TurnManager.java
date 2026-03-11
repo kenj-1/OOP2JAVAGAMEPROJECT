@@ -1,5 +1,8 @@
-package encantadia.battle;
+package encantadia.battle.engine;
 
+import encantadia.battle.skill.Skill;
+import encantadia.battle.status.StatusEffect;
+import encantadia.battle.result.TurnResult;
 import encantadia.characters.Character;
 
 import java.util.ArrayList;

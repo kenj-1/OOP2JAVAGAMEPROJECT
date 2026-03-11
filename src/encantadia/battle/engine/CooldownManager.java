@@ -1,4 +1,4 @@
-package encantadia.battle;
+package encantadia.battle.engine;
 
 import encantadia.characters.Character;
 

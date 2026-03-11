@@ -1,4 +1,4 @@
-package encantadia.ui.ux;
+package encantadia.ui.frames;
 
 import javax.swing.*;
 

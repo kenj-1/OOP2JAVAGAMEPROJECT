@@ -1,6 +1,6 @@
-package encantadia.battle;
+package encantadia.battle.status;
 
-import encantadia.characters.Character;
+import encantadia.battle.skill.Skill;
 
 /**
  * Represents a single active status effect applied to a character.

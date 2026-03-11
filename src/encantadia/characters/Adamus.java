@@ -1,6 +1,6 @@
 package encantadia.characters;
 
-import encantadia.battle.Skill;
+import encantadia.battle.skill.Skill;
 
 public class Adamus extends Character {
 

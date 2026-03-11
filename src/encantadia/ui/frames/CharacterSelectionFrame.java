@@ -1,4 +1,4 @@
-package encantadia.ui.ux;
+package encantadia.ui.frames;
 import encantadia.battle.EnemyFactory;
 
 import encantadia.characters.*;

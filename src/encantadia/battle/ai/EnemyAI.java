@@ -1,5 +1,6 @@
-package encantadia.battle;
+package encantadia.battle.ai;
 
+import encantadia.battle.engine.CooldownManager;
 import encantadia.characters.Character;
 
 import java.util.ArrayList;

@@ -1,9 +1,7 @@
 package encantadia;
 
 
-import encantadia.ui.ux.MainMenuFrame;
-
-import javax.swing.*;
+import encantadia.ui.frames.MainMenuFrame;
 
 public class Main{
     public static void main(String[] x){

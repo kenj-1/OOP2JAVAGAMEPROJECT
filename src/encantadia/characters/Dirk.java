@@ -1,6 +1,6 @@
 package encantadia.characters;
 
-import encantadia.battle.Skill; // ✅ Fix 1: was "Skills"
+import encantadia.battle.skill.Skill; // ✅ Fix 1: was "Skills"
 
 public class Dirk extends Character {
 

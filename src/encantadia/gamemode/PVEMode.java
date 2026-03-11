@@ -1,7 +1,6 @@
-package encantadia.ui.ux.gamemodeselection;
+package encantadia.gamemode;
 
 import javax.swing.*;
-import java.awt.*;
 
 public class PVEMode extends JFrame {
 

@@ -1,7 +1,10 @@
-package encantadia.ui.ux;
+package encantadia.ui.frames;
 
+import encantadia.battle.ai.EnemyAI;
+import encantadia.battle.engine.CooldownManager;
+import encantadia.battle.engine.TurnManager;
+import encantadia.battle.result.TurnResult;
 import encantadia.characters.Character;
-import encantadia.battle.*;
 
 import javax.swing.*;
 

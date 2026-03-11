@@ -1,4 +1,4 @@
-package encantadia.battle;
+package encantadia.battle.skill;
 
 import java.util.Random;
 
