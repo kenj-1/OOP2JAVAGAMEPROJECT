@@ -50,60 +50,78 @@ public class CharacterSelectionFrame extends JFrame {
 
 
         dirkCharacter.setText(
-                "<html><center>" +
-                        "Health: 5000HP<br>" +
-                        "Ultimate: Reduces enemy damage by 65% next turn" +
-                        "</center></html>"
+                createCharacterCard(
+                        "Dirk",
+                        "src/assets/dirk.png",
+                        "5000 HP",
+                        "Reduces enemy damage by 65% next turn"
+                )
         );
 
-
         maryCharacter.setText(
-                "<html><center>" +
-                        "Health: 5000HP<br>" +
-                        "Ultimate: Reduces enemy damage by 65% next turn" +
-                        "</center></html>"
+                createCharacterCard(
+                        "Mary",
+                        "src/assets/mary.png",
+                        "5000 HP",
+                        "50% chance to steal a turn"
+                )
         );
 
         makelanShereCharacter.setText(
-                "<html><center>" +
-                        "Health: 5000HP<br>" +
-                        "Ultimate: Reduces enemy damage by 65% next turn" +
-                        "</center></html>"
+                createCharacterCard(
+                        "Makelan Shere",
+                        "src/assets/makelan.png",
+                        "5000 HP",
+                        "Increase enemy cooldown by 1 turn"
+                )
         );
 
         tyroneCharacter.setText(
-                "<html><center>" +
-                        "Health: 5000HP<br>" +
-                        "Ultimate: Reduces enemy damage by 65% next turn" +
-                        "</center></html>"
+                createCharacterCard(
+                        "Tyrone",
+                        "src/assets/tyrone.png",
+                        "5000 HP",
+                        "Heavy strike dealing bonus damage"
+                )
         );
 
         deaCharacter.setText(
-                "<html><center>" +
-                        "Health: 5000HP<br>" +
-                        "Ultimate: Reduces enemy damage by 65% next turn" +
-                        "</center></html>"
-        );
-        flamaraCharacter.setText(
-                "<html><center>" +
-                        "Health: 5000HP<br>" +
-                        "Ultimate: Reduces enemy damage by 65% next turn" +
-                        "</center></html>"
+                createCharacterCard(
+                        "Dea",
+                        "src/assets/dea.png",
+                        "5000 HP",
+                        "60% chance to increase opponent cooldown"
+                )
         );
 
-        adamusCharacter.setText(
-                "<html><center>" +
-                        "Health: 5000HP<br>" +
-                        "Ultimate: Reduces enemy damage by 65% next turn" +
-                        "</center></html>"
+        flamaraCharacter.setText(
+                createCharacterCard(
+                        "Flamara",
+                        "src/assets/flamara.png",
+                        "5000 HP",
+                        "Throws additional damage of 300"
+                )
         );
 
         teraCharacter.setText(
-                "<html><center>" +
-                        "Health: 5000HP<br>" +
-                        "Ultimate: Reduces enemy damage by 65% next turn" +
-                        "</center></html>"
+                createCharacterCard(
+                        "Tera",
+                        "src/assets/tera.png",
+                        "5000 HP",
+                        "Heals 300 HP"
+                )
         );
+
+        adamusCharacter.setText(
+                createCharacterCard(
+                        "Adamus",
+                        "src/assets/adamus.png",
+                        "5000 HP",
+                        "Massive strike ignoring defense"
+                )
+        );
+
+
         selectDirk.setText("Select Dirk");
         selectMary.setText("Select Mary");
         selectDea.setText("Select Dea");
@@ -136,42 +154,30 @@ public class CharacterSelectionFrame extends JFrame {
     }
 
 
+    private String createCharacterCard(String name, String img, String health, String ultimate){
+
+        return "<html><div style='text-align:center;width:170px;'>"
+                + "<h3>" + name + "</h3>"
+                + "<img src='file:" + img + "' width='110' height='110'><br>"
+                + "<b>Health:</b> " + health + "<br>"
+                + "<b>Ultimate:</b> " + ultimate
+                + "</div></html>";
+    }
+
+
     private void showCharacterBackstory(Character character) {
 
-        String message =
-                character.getName() + "\n" +
-                        character.getTitle() + "\n\n" +
-                        character.getBackstory();
+        Character enemy = EnemyFactory.getRandomEnemy(character);
 
-        int choice = JOptionPane.showConfirmDialog(
-                this,
-                message,
-                "Chosen Fighter",
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.INFORMATION_MESSAGE
-        );
-
-        if(choice == JOptionPane.OK_OPTION){
-
-            Character enemy = EnemyFactory.getRandomEnemy(character);
-
-            String enemyMessage =
-                    enemy.getName() + "\n" +
-                            enemy.getTitle() + "\n\n" +
-                            enemy.getBackstory();
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    enemyMessage,
-                    "Enemy Appears!",
-                    JOptionPane.INFORMATION_MESSAGE
-            );
+        new StorylineDialogBox(character, enemy, () -> {
 
             new PVEBattleFrame(character, enemy);
 
-            dispose();
-        }
+        });
+
+        dispose();
     }
+
     private void createUIComponents() {
         // TODO: place custom component creation code here
     }

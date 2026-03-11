@@ -5,6 +5,8 @@ import encantadia.battle.engine.CooldownManager;
 import encantadia.battle.engine.TurnManager;
 import encantadia.battle.result.TurnResult;
 import encantadia.characters.Character;
+import encantadia.ui.frames.ResultDialogFrame;
+import encantadia.ui.frames.MainMenuFrame;
 
 import javax.swing.*;
 
@@ -45,16 +47,14 @@ public class PVEBattleFrame extends JFrame {
     private Character enemyCharacter;
 
     private int playerRoundsWon = 0;
-    private int enemyRoundsWon = 0;
-    private int currentRound = 1;
+    private int enemyRoundsWon  = 0;
+    private int currentRound    = 1;
 
-
-    public PVEBattleFrame(Character player, Character enemy){
+    public PVEBattleFrame(Character player, Character enemy) {
 
         this.playerCharacter = player;
-        this.enemyCharacter = enemy;
-
-        this.turnManager = new TurnManager(playerCharacter, enemyCharacter);
+        this.enemyCharacter  = enemy;
+        this.turnManager     = new TurnManager(playerCharacter, enemyCharacter);
 
         setContentPane(pveBattleFramee);
         setTitle("Encantadia: Echoes of the Gem - Battle");
@@ -63,17 +63,21 @@ public class PVEBattleFrame extends JFrame {
         setLocationRelativeTo(null);
 
         initializeBattleUI();
-
         setVisible(true);
     }
 
-    private void initializeBattleUI(){
+    // ── UI init ───────────────────────────────────────────────
 
-        playerName.setText(playerCharacter.getName());
-        enemyName.setText(enemyCharacter.getName());
+    private void initializeBattleUI() {
 
-        roundTitle.setText("Round " + currentRound);
-        bestOf3RoundsCounter.setText("First to 2 wins");
+        playerName.setText("<html><div style='text-align:center;'><h2>"
+                + playerCharacter.getName() + "</h2></div></html>");
+
+        enemyName.setText("<html><div style='text-align:center;'><h2>"
+                + enemyCharacter.getName() + "</h2></div></html>");
+
+        roundTitle.setText("<html><h2>Round " + currentRound + "</h2></html>");
+        bestOf3RoundsCounter.setText("<html><b>First to 2 Wins</b></html>");
 
         skill1Button.setText(playerCharacter.getSkills().get(0).getName());
         skill2Button.setText(playerCharacter.getSkills().get(1).getName());
@@ -85,196 +89,190 @@ public class PVEBattleFrame extends JFrame {
 
         updateHealthBars();
         updateCooldownCounters();
+        updateScoreBoard();
     }
 
-    private void useSkill(int skillIndex){
+    // ── Player turn ───────────────────────────────────────────
 
-        if(!turnManager.isPlayerTurn()){
-            return;
-        }
+    private void useSkill(int skillIndex) {
+
+        if (!turnManager.isPlayerTurn()) return;
 
         CooldownManager cd = turnManager.getCooldownManager();
-
-        if(cd.isOnCooldown(playerCharacter, skillIndex)){
+        if (cd.isOnCooldown(playerCharacter, skillIndex)) {
             invokingOfSkillsPlayer.setText("<html>Skill is still on cooldown!</html>");
             return;
         }
 
-        TurnResult result = turnManager.executeSkill(
-                playerCharacter,
-                enemyCharacter,
-                skillIndex
-        );
+        TurnResult result = turnManager.executeSkill(playerCharacter, enemyCharacter, skillIndex);
 
         displayBattleLog(result, false);
-
         updateHealthBars();
         updateCooldownCounters();
 
-        if(result.isTargetDefeated()){
+        if (result.isTargetDefeated()) {
             endRound(playerCharacter);
             return;
         }
 
-        if(!result.isTurnStolen()){
+        if (!result.isTurnStolen()) {
             turnManager.advanceTurn();
             enemyTurn();
         }
     }
 
-    private void enemyTurn(){
+    // ── Enemy turn ────────────────────────────────────────────
 
-        if(turnManager.isPlayerTurn()){
-            return;
-        }
+    private void enemyTurn() {
+
+        if (turnManager.isPlayerTurn()) return;
 
         boolean extraTurn;
 
-        do{
+        do {
+            int skillIndex = EnemyAI.chooseSkill(enemyCharacter, turnManager.getCooldownManager());
 
-            int skillIndex = EnemyAI.chooseSkill(
-                    enemyCharacter,
-                    turnManager.getCooldownManager()
-            );
-
-            TurnResult result = turnManager.executeSkill(
-                    enemyCharacter,
-                    playerCharacter,
-                    skillIndex
-            );
+            TurnResult result = turnManager.executeSkill(enemyCharacter, playerCharacter, skillIndex);
 
             displayBattleLog(result, true);
-
             updateHealthBars();
             updateCooldownCounters();
 
-            if(result.isTargetDefeated()){
+            if (result.isTargetDefeated()) {
                 endRound(enemyCharacter);
                 return;
             }
 
             extraTurn = result.isTurnStolen();
 
-        } while(extraTurn && playerCharacter.isAlive());
+        } while (extraTurn && playerCharacter.isAlive());
 
         turnManager.advanceTurn();
     }
 
-    private void endRound(Character winner){
+    // ── Round / match end ─────────────────────────────────────
 
-        if(winner == playerCharacter){
+    private void endRound(Character winner) {
+
+        Character loser = (winner == playerCharacter) ? enemyCharacter : playerCharacter;
+
+        if (winner == playerCharacter) {
             playerRoundsWon++;
-            updateScoreBoard();
         } else {
             enemyRoundsWon++;
-            updateScoreBoard();
         }
 
-        // If someone reached 2 wins -> battle ends
-        if(playerRoundsWon == 2 || enemyRoundsWon == 2){
+        updateScoreBoard();
 
-            String finalWinner =
-                    playerRoundsWon > enemyRoundsWon ?
-                            playerCharacter.getName() :
-                            enemyCharacter.getName();
+        // ── Match over ────────────────────────────────────────
+        if (playerRoundsWon == 2 || enemyRoundsWon == 2) {
 
-            JOptionPane.showMessageDialog(this,
-                    finalWinner + " wins the battle!\n\nFinal Score\n"
-                            + playerCharacter.getName() + " : " + playerRoundsWon + "\n"
-                            + enemyCharacter.getName() + " : " + enemyRoundsWon
+            int wScore = (winner == playerCharacter) ? playerRoundsWon : enemyRoundsWon;
+            int lScore = (winner == playerCharacter) ? enemyRoundsWon  : playerRoundsWon;
+
+            ResultDialogFrame.showMatchResult(
+                    this,
+                    winner,
+                    loser,
+                    wScore,
+                    lScore,
+                    () -> {
+                        new MainMenuFrame();
+                        dispose();
+
+                    }
             );
 
-            dispose();
             return;
         }
 
-        // Round winner announcement
-        JOptionPane.showMessageDialog(this,
-                winner.getName() + " wins Round " + currentRound + "!\n\n" +
-                        "Score\n" +
-                        playerCharacter.getName() + " : " + playerRoundsWon + "\n" +
-                        enemyCharacter.getName() + " : " + enemyRoundsWon
+        // ── Round over — show result, then go to next round ───
+        int nextRound = currentRound + 1;
+
+        int wScore = (winner == playerCharacter) ? playerRoundsWon : enemyRoundsWon;
+        int lScore = (winner == playerCharacter) ? enemyRoundsWon  : playerRoundsWon;
+
+        ResultDialogFrame.showRoundResult(
+                this,
+                winner,
+                loser,
+                wScore,
+                lScore,
+                nextRound,
+                () -> {
+                    currentRound = nextRound;
+                    resetRound();
+                }
         );
-
-        currentRound++;
-
-        // Ready confirmation for next round
-        JOptionPane.showMessageDialog(this,
-                "Prepare for Round " + currentRound + "!\n\n" +
-                        "Current Score\n" +
-                        playerCharacter.getName() + " : " + playerRoundsWon + "\n" +
-                        enemyCharacter.getName() + " : " + enemyRoundsWon
-        );
-
-        resetRound();
     }
 
-    private void resetRound(){
+    private void resetRound() {
 
+        // Full heal both characters
         playerCharacter.heal(playerCharacter.getMaxHP());
         enemyCharacter.heal(enemyCharacter.getMaxHP());
 
+        // Fresh turn manager (resets all cooldowns and status effects)
         turnManager = new TurnManager(playerCharacter, enemyCharacter);
 
-        roundTitle.setText("Round " + currentRound);
+        roundTitle.setText("<html><h2>Round " + currentRound + "</h2></html>");
 
         updateHealthBars();
         updateCooldownCounters();
+        invokingOfSkillsPlayer.setText("");
+        invokingOfSkillsEnemy.setText("");
     }
 
-    private void updateHealthBars(){
+    // ── UI update helpers ─────────────────────────────────────
 
-        playerHP.setText(
-                playerCharacter.getCurrentHP() +
-                        " / " +
-                        playerCharacter.getMaxHP()
-        );
+    private void updateHealthBars() {
 
-        enemyHP.setText(
-                enemyCharacter.getCurrentHP() +
-                        " / " +
-                        enemyCharacter.getMaxHP()
-        );
+        playerHP.setText("<html><b>HP:</b> "
+                + playerCharacter.getCurrentHP() + " / "
+                + playerCharacter.getMaxHP() + "</html>");
+
+        enemyHP.setText("<html><b>HP:</b> "
+                + enemyCharacter.getCurrentHP() + " / "
+                + enemyCharacter.getMaxHP() + "</html>");
     }
 
-    private void updateCooldownCounters(){
+    private void updateCooldownCounters() {
 
         CooldownManager cd = turnManager.getCooldownManager();
 
-        int cd1 = cd.getRemainingCooldown(playerCharacter,0);
-        int cd2 = cd.getRemainingCooldown(playerCharacter,1);
-        int cd3 = cd.getRemainingCooldown(playerCharacter,2);
+        int cd1 = cd.getRemainingCooldown(playerCharacter, 0);
+        int cd2 = cd.getRemainingCooldown(playerCharacter, 1);
+        int cd3 = cd.getRemainingCooldown(playerCharacter, 2);
 
         skill1CooldownCounter.setText(formatCooldown(cd1));
         skill2CooldownCounter.setText(formatCooldown(cd2));
         ultimateCooldownCounter.setText(formatCooldown(cd3));
 
-        // Disable buttons if skill is on cooldown
         skill1Button.setEnabled(cd1 == 0);
         skill2Button.setEnabled(cd2 == 0);
         skill3Button.setEnabled(cd3 == 0);
     }
 
-    private void displayBattleLog(TurnResult result, boolean playerAction){
+    private void displayBattleLog(TurnResult result, boolean isEnemy) {
 
         StringBuilder log = new StringBuilder();
-
-        for(String line : result.getLogMessages()){
+        for (String line : result.getLogMessages()) {
             log.append(line).append("<br>");
         }
 
-        if(playerAction){
-            invokingOfSkillsPlayer.setText("<html>" + log + "</html>");
-        } else {
+        if (isEnemy) {
             invokingOfSkillsEnemy.setText("<html>" + log + "</html>");
+        } else {
+            invokingOfSkillsPlayer.setText("<html>" + log + "</html>");
         }
     }
 
-    private String formatCooldown(int cd){
-        return cd == 0 ? "READY" : String.valueOf(cd);
+    private String formatCooldown(int cd) {
+        if (cd == 0) return "<html><font color='green'><b>READY</b></font></html>";
+        return "<html><font color='red'>" + cd + "</font></html>";
     }
 
-    private void updateScoreBoard(){
+    private void updateScoreBoard() {
         playerScore.setText(String.valueOf(playerRoundsWon));
         enemyScore.setText(String.valueOf(enemyRoundsWon));
     }
