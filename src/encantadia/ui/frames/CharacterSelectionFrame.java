@@ -3,6 +3,7 @@ import encantadia.battle.EnemyFactory;
 
 import encantadia.characters.*;
 import encantadia.characters.Character;
+import encantadia.ui.frames.battleModeFrames.PVEBattleFrame;
 
 
 import javax.swing.*;
@@ -45,7 +46,73 @@ public class CharacterSelectionFrame extends JFrame {
         setLocationRelativeTo(null);
 
         ImageIcon icon = new ImageIcon("src/assets/Portrait_Placeholder.png");
-        Image img = icon.getImage().getScaledInstance(50, 50, Image.SCALE_SMOOTH);
+        Image img = icon.getImage().getScaledInstance(120, 120, Image.SCALE_SMOOTH);
+
+
+        dirkCharacter.setText(
+                "<html><center>" +
+                        "Health: 5000HP<br>" +
+                        "Ultimate: Reduces enemy damage by 65% next turn" +
+                        "</center></html>"
+        );
+
+
+        maryCharacter.setText(
+                "<html><center>" +
+                        "Health: 5000HP<br>" +
+                        "Ultimate: Reduces enemy damage by 65% next turn" +
+                        "</center></html>"
+        );
+
+        makelanShereCharacter.setText(
+                "<html><center>" +
+                        "Health: 5000HP<br>" +
+                        "Ultimate: Reduces enemy damage by 65% next turn" +
+                        "</center></html>"
+        );
+
+        tyroneCharacter.setText(
+                "<html><center>" +
+                        "Health: 5000HP<br>" +
+                        "Ultimate: Reduces enemy damage by 65% next turn" +
+                        "</center></html>"
+        );
+
+        deaCharacter.setText(
+                "<html><center>" +
+                        "Health: 5000HP<br>" +
+                        "Ultimate: Reduces enemy damage by 65% next turn" +
+                        "</center></html>"
+        );
+        flamaraCharacter.setText(
+                "<html><center>" +
+                        "Health: 5000HP<br>" +
+                        "Ultimate: Reduces enemy damage by 65% next turn" +
+                        "</center></html>"
+        );
+
+        adamusCharacter.setText(
+                "<html><center>" +
+                        "Health: 5000HP<br>" +
+                        "Ultimate: Reduces enemy damage by 65% next turn" +
+                        "</center></html>"
+        );
+
+        teraCharacter.setText(
+                "<html><center>" +
+                        "Health: 5000HP<br>" +
+                        "Ultimate: Reduces enemy damage by 65% next turn" +
+                        "</center></html>"
+        );
+        selectDirk.setText("Select Dirk");
+        selectMary.setText("Select Mary");
+        selectDea.setText("Select Dea");
+        selectFlamara.setText("Select Flamara");
+        selectTera.setText("Select Tera");
+        selectAdamus.setText("Select Adamus");
+        selectTyrone.setText("Select Tyrone");
+        selectMakelanShere.setText("Select Makelan Shere");
+
 
         labelDirk.setIcon(new ImageIcon(img));
         labelMary.setIcon(new ImageIcon(img));
@@ -100,7 +167,7 @@ public class CharacterSelectionFrame extends JFrame {
                     JOptionPane.INFORMATION_MESSAGE
             );
 
-            new BattleFrame(character, enemy);
+            new PVEBattleFrame(character, enemy);
 
             dispose();
         }

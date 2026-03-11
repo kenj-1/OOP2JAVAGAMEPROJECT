@@ -1,4 +1,4 @@
-package encantadia.ui.frames;
+package encantadia.ui.frames.battleModeFrames;
 
 import encantadia.battle.ai.EnemyAI;
 import encantadia.battle.engine.CooldownManager;
@@ -8,7 +8,7 @@ import encantadia.characters.Character;
 
 import javax.swing.*;
 
-public class BattleFrame extends JFrame {
+public class PVEBattleFrame extends JFrame {
 
     private TurnManager turnManager;
 
@@ -32,14 +32,14 @@ public class BattleFrame extends JFrame {
     private JLabel skill2CooldownCounter;
     private JLabel ultimateCooldownCounter;
 
-    private JPanel battleFramePanel;
-    private JLabel invokingOfSkills;
-    private JLabel ultimateEffectLabel;
+    private JPanel pveBattleFramee;
+    private JLabel invokingOfSkillsPlayer;
     private JLabel skill1DamageRange;
     private JLabel skill2DamageRange;
     private JLabel ultimateDamageRange;
     private JLabel playerScore;
     private JLabel enemyScore;
+    private JLabel invokingOfSkillsEnemy;
 
     private Character playerCharacter;
     private Character enemyCharacter;
@@ -48,14 +48,15 @@ public class BattleFrame extends JFrame {
     private int enemyRoundsWon = 0;
     private int currentRound = 1;
 
-    public BattleFrame(Character player, Character enemy){
+
+    public PVEBattleFrame(Character player, Character enemy){
 
         this.playerCharacter = player;
         this.enemyCharacter = enemy;
 
         this.turnManager = new TurnManager(playerCharacter, enemyCharacter);
 
-        setContentPane(battleFramePanel);
+        setContentPane(pveBattleFramee);
         setTitle("Encantadia: Echoes of the Gem - Battle");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1024, 768);
@@ -95,7 +96,7 @@ public class BattleFrame extends JFrame {
         CooldownManager cd = turnManager.getCooldownManager();
 
         if(cd.isOnCooldown(playerCharacter, skillIndex)){
-            invokingOfSkills.setText("<html>Skill is still on cooldown!</html>");
+            invokingOfSkillsPlayer.setText("<html>Skill is still on cooldown!</html>");
             return;
         }
 
@@ -105,7 +106,7 @@ public class BattleFrame extends JFrame {
                 skillIndex
         );
 
-        displayBattleLog(result);
+        displayBattleLog(result, false);
 
         updateHealthBars();
         updateCooldownCounters();
@@ -142,7 +143,7 @@ public class BattleFrame extends JFrame {
                     skillIndex
             );
 
-            displayBattleLog(result);
+            displayBattleLog(result, true);
 
             updateHealthBars();
             updateCooldownCounters();
@@ -254,7 +255,7 @@ public class BattleFrame extends JFrame {
         skill3Button.setEnabled(cd3 == 0);
     }
 
-    private void displayBattleLog(TurnResult result){
+    private void displayBattleLog(TurnResult result, boolean playerAction){
 
         StringBuilder log = new StringBuilder();
 
@@ -262,7 +263,11 @@ public class BattleFrame extends JFrame {
             log.append(line).append("<br>");
         }
 
-        invokingOfSkills.setText("<html>" + log + "</html>");
+        if(playerAction){
+            invokingOfSkillsPlayer.setText("<html>" + log + "</html>");
+        } else {
+            invokingOfSkillsEnemy.setText("<html>" + log + "</html>");
+        }
     }
 
     private String formatCooldown(int cd){
