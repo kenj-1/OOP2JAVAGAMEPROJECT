@@ -59,7 +59,7 @@ public class MainMenuFrame extends JFrame {
         arcadeButton = createImageButton(BTN_ARCADE, "Arcade");
         PVEButton    = createImageButton(BTN_PVE,    "Player V.S Enemy");
         PVPButton    = createImageButton(BTN_PVP,    "Player V.S Player");
-        exitGameButton = createTextButton("Exit");
+        exitGameButton = createTextButton("Back to Main Menu");
 
         buttonsPanel.add(Box.createVerticalGlue());
         buttonsPanel.add(centerButton(arcadeButton));
@@ -89,7 +89,7 @@ public class MainMenuFrame extends JFrame {
         arcadeButton.addActionListener(ev -> { new ArcadeMode(); dispose(); });
         PVEButton.addActionListener(   ev -> { new PVEMode();    dispose(); });
         PVPButton.addActionListener(   ev -> { new PVPMode();    dispose(); });
-        exitGameButton.addActionListener(ev -> System.exit(0));
+        exitGameButton.addActionListener(ev -> {new WelcomeScreenPage(); dispose();});
 
         setVisible(true);
 
@@ -134,7 +134,7 @@ public class MainMenuFrame extends JFrame {
         exitGameButton.setMaximumSize(new Dimension(btnW, (int)(btnH * 0.75)));
 
         // Panel: centered, tall enough to hold all 4 buttons + gaps
-        int btnPanelH = (btnH * 3) + (int)(btnH * 0.75) + (16 * 3) + 20;
+        int btnPanelH = (btnH * 3) + (int)(btnH * 0.75) + (22 * 3) + 40;
         int btnPanelW = btnW + 20;
         int btnPanelX = (w - btnPanelW) / 2;
         int btnPanelY = (int)(h * 0.30);

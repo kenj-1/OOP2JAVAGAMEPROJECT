@@ -3,6 +3,7 @@ package encantadia.ui.frames;
 import encantadia.characters.Character;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
 public class StorylineDialogBox extends JFrame {
@@ -10,10 +11,10 @@ public class StorylineDialogBox extends JFrame {
     private JLabel playerPortrait;
     private JLabel enemyPortrait;
 
-    private JTextArea storyBox;
+    private JTextPane storyBox;
 
     private JButton skipButton;
-    private JButton battleButton;
+    private JButton actionButton;
 
     private Character player;
     private Character enemy;
@@ -21,7 +22,6 @@ public class StorylineDialogBox extends JFrame {
     private Runnable onFinish;
 
     private boolean enemyStoryStarted = false;
-
     private volatile boolean skipAnimation = false;
 
     public StorylineDialogBox(Character player, Character enemy, Runnable onFinish){
@@ -30,46 +30,65 @@ public class StorylineDialogBox extends JFrame {
         this.enemy = enemy;
         this.onFinish = onFinish;
 
-        setTitle("Storyline");
+        setTitle("Encantadia Story");
         setSize(1024,768);
         setLocationRelativeTo(null);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setLayout(null);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
-        JLabel background = new JLabel();
-        background.setBounds(0,0,1024,768);
-        background.setIcon(new ImageIcon("src/assets/story_background.png"));
+        BackgroundPanel root = new BackgroundPanel("src/assets/story_background.png");
+        root.setLayout(new BorderLayout());
+        setContentPane(root);
+
+        JPanel portraits = new JPanel(new BorderLayout());
+        portraits.setOpaque(false);
+        portraits.setBorder(new EmptyBorder(40,80,20,80));
 
         playerPortrait = new JLabel(loadCharacterImage(player));
-        playerPortrait.setBounds(120,220,250,250);
-
         enemyPortrait = new JLabel(loadCharacterImage(enemy));
-        enemyPortrait.setBounds(650,220,250,250);
 
-        storyBox = new JTextArea();
-        storyBox.setBounds(200,520,620,140);
-        storyBox.setFont(new Font("Serif",Font.BOLD,18));
-        storyBox.setLineWrap(true);
-        storyBox.setWrapStyleWord(true);
+        playerPortrait.setHorizontalAlignment(SwingConstants.CENTER);
+        enemyPortrait.setHorizontalAlignment(SwingConstants.CENTER);
+
+        portraits.add(playerPortrait, BorderLayout.WEST);
+        portraits.add(enemyPortrait, BorderLayout.EAST);
+
+        root.add(portraits, BorderLayout.CENTER);
+
+        storyBox = new JTextPane();
+        storyBox.setContentType("text/html");
         storyBox.setEditable(false);
+        storyBox.setOpaque(false);
+        storyBox.setFont(new Font("Serif",Font.PLAIN,18));
+
+        JScrollPane scroll = new JScrollPane(storyBox);
+        scroll.setBorder(new EmptyBorder(10,80,10,80));
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+
+        root.add(scroll, BorderLayout.SOUTH);
+
+        JPanel buttons = new JPanel();
+        buttons.setOpaque(false);
 
         skipButton = new JButton("Skip");
-        skipButton.setBounds(320,680,120,35);
+        actionButton = new JButton("Reveal Enemy");
+        actionButton.setEnabled(false);
 
-        battleButton = new JButton("Reveal Enemy");
-        battleButton.setBounds(480,680,160,35);
-        battleButton.setEnabled(false);
+        buttons.add(skipButton);
+        buttons.add(actionButton);
+
+        root.add(buttons, BorderLayout.NORTH);
+
         skipButton.addActionListener(e -> skipAnimation = true);
 
-        battleButton.addActionListener(e -> {
+        actionButton.addActionListener(e -> {
 
             if(!enemyStoryStarted){
 
                 enemyStoryStarted = true;
-
-                battleButton.setEnabled(false);
                 storyBox.setText("");
 
+                actionButton.setEnabled(false);
                 startEnemyStory();
 
             }else{
@@ -82,16 +101,9 @@ public class StorylineDialogBox extends JFrame {
             }
         });
 
-        add(playerPortrait);
-        add(enemyPortrait);
-        add(storyBox);
-        add(skipButton);
-        add(battleButton);
-        add(background);
-
         setVisible(true);
 
-        startStory();
+        startPlayerStory();
     }
 
     private ImageIcon loadCharacterImage(Character c){
@@ -100,60 +112,53 @@ public class StorylineDialogBox extends JFrame {
                 "src/assets/" + c.getName().toLowerCase() + ".png"
         );
 
-        Image img = icon.getImage().getScaledInstance(220,220,Image.SCALE_SMOOTH);
+        Image img = icon.getImage().getScaledInstance(250,250,Image.SCALE_SMOOTH);
 
         return new ImageIcon(img);
     }
 
-    private void typeText(String text) throws InterruptedException {
+    private void typeText(String text) throws InterruptedException{
 
         if(skipAnimation){
-            SwingUtilities.invokeLater(() ->
-                    storyBox.append(text)
-            );
+            SwingUtilities.invokeLater(() -> storyBox.setText(text));
             return;
         }
 
-        StringBuilder builder = new StringBuilder(storyBox.getText());
+        StringBuilder builder = new StringBuilder();
 
         for(char c : text.toCharArray()){
 
             if(skipAnimation){
-                String finalText = builder.toString() + text.substring(builder.length());
-                SwingUtilities.invokeLater(() ->
-                        storyBox.setText(finalText)
-                );
+                SwingUtilities.invokeLater(() -> storyBox.setText(text));
                 return;
             }
 
             builder.append(c);
-
             String current = builder.toString();
 
             SwingUtilities.invokeLater(() ->
-                    storyBox.setText(current)
+                    storyBox.setText("<html><div style='width:700px'>" + current + "</div></html>")
             );
 
-            Thread.sleep(25);
+            Thread.sleep(18);
         }
     }
 
-    private void startStory(){
-
-        storyBox.setText("");
+    private void startPlayerStory(){
 
         new Thread(() -> {
 
             try{
 
-                String playerStory =
-                        player.getName() + " - " + player.getTitle() + "\n\n" +
-                                player.getBackstory();
+                String story =
+                        "<h2>" + player.getName() + "</h2>" +
+                                "<h4>" + player.getTitle() + "</h4>" +
+                                "<p>" + player.getBackstory() + "</p>";
 
-                typeText(playerStory);
+                typeText(story);
 
                 SwingUtilities.invokeLater(() ->
-                        battleButton.setEnabled(true)
+                        actionButton.setEnabled(true)
                 );
 
             }catch(Exception ignored){}
@@ -167,22 +172,37 @@ public class StorylineDialogBox extends JFrame {
 
             try{
 
-                String enemyStory =
-                        "Enemy Appears!\n\n" +
-                                enemy.getName() + " - " + enemy.getTitle() + "\n\n" +
-                                enemy.getBackstory();
+                String story =
+                        "<h2>Enemy Appears</h2>" +
+                                "<h3>" + enemy.getName() + "</h3>" +
+                                "<h4>" + enemy.getTitle() + "</h4>" +
+                                "<p>" + enemy.getBackstory() + "</p>";
 
-                typeText(enemyStory);
+                typeText(story);
 
                 SwingUtilities.invokeLater(() -> {
 
-                    battleButton.setText("Begin Battle");
-                    battleButton.setEnabled(true);
+                    actionButton.setText("Begin Battle");
+                    actionButton.setEnabled(true);
 
                 });
 
             }catch(Exception ignored){}
 
         }).start();
+    }
+
+    private static class BackgroundPanel extends JPanel{
+
+        private Image background;
+
+        public BackgroundPanel(String path){
+            background = new ImageIcon(path).getImage();
+        }
+
+        protected void paintComponent(Graphics g){
+            super.paintComponent(g);
+            g.drawImage(background,0,0,getWidth(),getHeight(),this);
+        }
     }
 }
