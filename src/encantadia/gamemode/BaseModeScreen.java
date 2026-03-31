@@ -159,10 +159,10 @@ public abstract class BaseModeScreen extends JFrame {
         questionPanel.setBounds(qX, qY, qW, qH);
 
         // ── YES / NO buttons ──────────────────────────────────
-        int btnH = (int)(44  * scale);
-        int yesW = (int)(96  * scale);
-        int noW  = (int)(78  * scale);
-        int gap  = (int)(20  * scale);
+        int btnH = (int)(42 * scale);
+        int yesW = (int)(btnH * 2.6);
+        int noW  = (int)(btnH * 2.2);
+        int gap  = (int)(18 * scale);
 
         setFull(yesButton, yesW, btnH);
         setFull(noButton,  noW,  btnH);

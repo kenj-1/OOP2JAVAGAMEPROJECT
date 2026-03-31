@@ -13,9 +13,9 @@ public class WelcomeScreenPage extends JFrame {
     // ── Asset paths ───────────────────────────────────────────
     private static final String BG_PATH      = "/resources/welcomeScreen_JAVA.png";
     private static final String TITLE_PATH   = "/resources/gameTitle.png";
-    private static final String BTN_PLAY     = "/resources/playButton.png";
-    private static final String BTN_OPTIONS  = "/resources/optionsButton.png";
-    private static final String BTN_EXIT     = "/resources/exitButton.png";
+    private static final String BTN_PLAY     = "/resources/playButton (1).png";
+    private static final String BTN_OPTIONS  = "/resources/optionsButton (1).png";
+    private static final String BTN_EXIT     = "/resources/exitButton (1).png";
 
     // ── Form-bound fields ─────────────────────────────────────
     private JButton playButton;
@@ -85,7 +85,10 @@ public class WelcomeScreenPage extends JFrame {
             JOptionPane.showMessageDialog(this, "Options coming soon!");
         });
 
-        exitButton.addActionListener(e -> System.exit(0));
+        exitButton.addActionListener(e -> {
+            dispose();
+            new ExitConfirmDialog();
+        });
 
         setVisible(true);
         ScreenManager.register(this);
@@ -106,56 +109,54 @@ public class WelcomeScreenPage extends JFrame {
                                   JPanel bg,
                                   JPanel title,
                                   JPanel buttons) {
+
         int w = pane.getWidth();
         int h = pane.getHeight();
         if (w == 0 || h == 0) return;
 
-        // Background fills everything
+        // ── Scale (base 1024x768) ───────────────────────────────
+        double scale = Math.min(w / 1024.0, h / 768.0);
+        scale = Math.min(scale, 1.5);
+
         bg.setBounds(0, 0, w, h);
 
-        // Title: upper-center
-        int titleW = (int)(w * 0.55);
-        int titleH = (int)(titleW * 0.30);
+        // ── Title ───────────────────────────────────────────────
+        int titleW = (int)(500 * scale);
+        int titleH = (int)(titleW * 0.38);
         int titleX = (w - titleW) / 2;
-        int titleY = (int)(h * 0.05);
+        int titleY = (int)(50 * scale);
+
         title.setBounds(titleX, titleY, titleW, titleH);
 
-        // Button sizing
-        int btnH   = (int)(h * 0.10);
-        int btnW   = (int)(btnH * 4.5);
-        int btnGap = (int)(h * 0.06);   // ✅ bigger gap — was 0.025, now 0.06
+        // ── Buttons (ABSOLUTE CONTROL) ──────────────────────────
+        buttons.setLayout(null);
 
-        playButton.setPreferredSize(new Dimension(btnW, btnH));
-        playButton.setMaximumSize(new Dimension(btnW, btnH));
-        optionButton.setPreferredSize(new Dimension(btnW, btnH));
-        optionButton.setMaximumSize(new Dimension(btnW, btnH));
-        exitButton.setPreferredSize(new Dimension(btnW, btnH));
-        exitButton.setMaximumSize(new Dimension(btnW, btnH));
+        int btnW = (int)(320 * scale);
+        int btnH = (int)(btnW * 0.30);   // 🔥 FIX: better ratio (not compressed)
+        int gap  = (int)(25 * scale);
 
-        int btnPanelH = (btnH * 3) + (btnGap * 2) + 10;
-        int btnPanelW = btnW + 40;
-        int btnPanelX = (w - btnPanelW) / 2;
+        int totalH = (btnH * 3) + (gap * 2);
 
-        // ✅ Also update the BoxLayout struts to match the new gap
+        // Center vertically slightly below middle
+        int startY = (int)(h * 0.60 - totalH / 2);
+
+        int centerX = w / 2 - btnW / 2;
+
+        playButton.setBounds(centerX, startY, btnW, btnH);
+        optionButton.setBounds(centerX, startY + btnH + gap, btnW, btnH);
+        exitButton.setBounds(centerX, startY + (btnH + gap) * 2, btnW, btnH);
+
+        buttons.setBounds(0, 0, w, h);
+
         buttons.removeAll();
-        buttons.add(Box.createVerticalGlue());
-        buttons.add(centerButton(playButton));
-        buttons.add(Box.createVerticalStrut(btnGap));
-        buttons.add(centerButton(optionButton));
-        buttons.add(Box.createVerticalStrut(btnGap));
-        buttons.add(centerButton(exitButton));
-        buttons.add(Box.createVerticalGlue());
-
-        // Center panel between 58% and 97% of frame height
-        int zoneTop   = (int)(h * 0.58);
-        int zoneBottom = (int)(h * 0.97);
-        int btnPanelY = zoneTop + (zoneBottom - zoneTop - btnPanelH) / 2;
-
-        buttons.setBounds(btnPanelX, btnPanelY, btnPanelW, btnPanelH);
+        buttons.add(playButton);
+        buttons.add(optionButton);
+        buttons.add(exitButton);
 
         buttons.revalidate();
         buttons.repaint();
     }
+
 
     // ── Helpers ───────────────────────────────────────────────
 
@@ -184,6 +185,12 @@ public class WelcomeScreenPage extends JFrame {
                         RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                         RenderingHints.VALUE_ANTIALIAS_ON);
+
+
+                if (getModel().isRollover()) {
+                    g2.scale(1.03, 1.03);
+                }
+
 
                 if (img != null) {
                     if (getModel().isRollover()) {

@@ -18,7 +18,7 @@ public class BackstoryShowcase extends JFrame {
     private static final String PARCHMENT_PATH = "/resources/base1SBS.png";
 
     private static final int    PARAGRAPHS_PER_PAGE = 10;
-    private static final int    CHAR_DELAY_MS       = 18;
+    private static final int    CHAR_DELAY_MS       = 14;
     private static final double PARCHMENT_RATIO     = 0.42;
 
     private static final Color INK_DARK = new Color(0x3A, 0x18, 0x04);
@@ -165,20 +165,25 @@ public class BackstoryShowcase extends JFrame {
         int h = getHeight();
         if (w == 0 || h == 0) return;
 
+        double scale = Math.min(w / 1024.0, h / 768.0);
+        scale = Math.min(scale, 1.4);
+
         int parchmentH = (int)(h * PARCHMENT_RATIO);
         parchmentPanel.setPreferredSize(new Dimension(w, parchmentH));
 
-        int hPad = (int)(w * 0.09);
-        int vTop = (int)(parchmentH * 0.07);
-        int vBot = (int)(parchmentH * 0.04);
+        int hPad = (int)(w * 0.08);
+        int vTop = (int)(parchmentH * 0.06);
+        int vBot = (int)(parchmentH * 0.035);
         innerPanel.setBorder(BorderFactory.createEmptyBorder(vTop, hPad, vBot, hPad));
 
-        int btnW = Math.max(110, (int)(w * 0.13));
-        continueButton.setPreferredSize(new Dimension(btnW, 36));
-        skipButton.setPreferredSize(new Dimension(btnW, 36));
+        int btnW = (int)(140 * scale);
+        int btnH = (int)(40 * scale);
 
-        fontSize  = Math.max(8, (int)(parchmentH * 0.060));
-        titleSize = (int)(fontSize * 1.20);
+        continueButton.setPreferredSize(new Dimension(btnW, btnH));
+        skipButton.setPreferredSize(new Dimension(btnW, btnH));
+
+        fontSize  = (int)(11 * scale);
+        titleSize = (int)(fontSize * 1.35);
 
         if (animThread == null || !animThread.isAlive()) {
             renderFull(currentPage, fontSize, titleSize);
@@ -196,48 +201,61 @@ public class BackstoryShowcase extends JFrame {
         stopAnimThread();
 
         continueButton.setEnabled(false);
-        continueButton.setText(isLastPage() ? "Begin  \u00bb" : "Continue  \u00bb");
+        continueButton.setText(isLastPage() ? "Begin  »" : "Continue  »");
         pageLabel.setText("  Page " + (page + 1) + " of " + totalPages);
 
-        final int fs   = fontSize;
-        final int ts   = titleSize;
-        final int from = page * PARAGRAPHS_PER_PAGE;
-        final int to   = Math.min(from + PARAGRAPHS_PER_PAGE, paragraphs.length);
+        final int fs = fontSize;
+        final int ts = titleSize;
+
+        int from = page * PARAGRAPHS_PER_PAGE;
+        int to   = Math.min(from + PARAGRAPHS_PER_PAGE, paragraphs.length);
+
+        StringBuilder body = new StringBuilder();
+        for (int i = from; i < to; i++) body.append(paragraphs[i]);
+
+        final String fullHtml = buildPageHtml(body.toString(), page == 0, fs, ts);
+
+        // Split HTML safely
+        final int bodyStart = fullHtml.indexOf("<body>") + 6;
+        final int bodyEnd   = fullHtml.lastIndexOf("</body>");
+
+        final String prefix = fullHtml.substring(0, bodyStart);
+        final String content = fullHtml.substring(bodyStart, bodyEnd);
+        final String suffix = "</body></html>";
 
         animThread = new Thread(() -> {
             try {
-                StringBuilder rawBody = new StringBuilder();
-                for (int i = from; i < to; i++) rawBody.append(paragraphs[i]);
-                final String fullHtml = buildPageHtml(rawBody.toString(), page == 0, fs, ts);
-
-                final int bodyOpen  = fullHtml.indexOf("<body>") + "<body>".length();
-                final int firstPara = indexOfFirstParagraph(fullHtml, bodyOpen);
-                final int closing   = fullHtml.lastIndexOf("</body>");
-
-                final String prefix   = fullHtml.substring(0, firstPara);
-                final String animBody = fullHtml.substring(firstPara, closing);
-                final String suffix   = "</body></html>";
-
-                final StringBuilder visible = new StringBuilder(animBody.length());
+                StringBuilder visible = new StringBuilder();
                 boolean inTag = false;
 
-                for (int i = 0; i < animBody.length(); i++) {
+                for (int i = 0; i < content.length(); i++) {
                     if (Thread.currentThread().isInterrupted()) return;
 
-                    char c = animBody.charAt(i);
+                    char c = content.charAt(i);
                     visible.append(c);
 
-                    if (c == '<') { inTag = true;  continue; }
+                    // Handle HTML tags (skip delay)
+                    if (c == '<') { inTag = true; continue; }
                     if (c == '>') { inTag = false; continue; }
-                    if (inTag)    { continue; }
+                    if (inTag) continue;
 
                     final String snap = prefix + visible + suffix;
+
                     SwingUtilities.invokeLater(() -> {
                         storyPane.setText(snap);
-                        int len = storyPane.getDocument().getLength();
-                        storyPane.setCaretPosition(Math.max(0, len));
+                        storyPane.setCaretPosition(
+                                storyPane.getDocument().getLength()
+                        );
                     });
-                    Thread.sleep(CHAR_DELAY_MS);
+
+                    // 🎭 DRAMATIC TIMING
+                    if (c == '.' || c == '!' || c == '?') {
+                        Thread.sleep(220); // long pause
+                    } else if (c == ',') {
+                        Thread.sleep(120); // medium pause
+                    } else {
+                        Thread.sleep(CHAR_DELAY_MS); // normal typing
+                    }
                 }
 
                 SwingUtilities.invokeLater(() -> {
@@ -247,7 +265,7 @@ public class BackstoryShowcase extends JFrame {
                 });
 
             } catch (InterruptedException ignored) {}
-        }, "anim-page-" + page);
+        });
 
         animThread.setDaemon(true);
         animThread.start();
@@ -319,7 +337,7 @@ public class BackstoryShowcase extends JFrame {
         return "<html><head><style>"
                 + "body{font-family:'Georgia','Times New Roman',serif;"
                 +      "font-size:" + fs + "px;color:" + inkDark + ";"
-                +      "margin:0;padding:0;line-height:1.85;text-align:justify;}"
+                +      "margin:0;padding:0;line-height:1.6;text-align:justify;}"
                 + "h1{font-size:" + ts + "px;letter-spacing:3px;color:" + inkMid + ";"
                 +    "text-align:center;margin:0 0 4px 0;font-variant:small-caps;font-style:italic;}"
                 + "p{margin:0 0 6px 0;text-indent:1.6em;}"
@@ -393,43 +411,58 @@ public class BackstoryShowcase extends JFrame {
     // ══════════════════════════════════════════════════════════
     private JButton makeStyledButton(String text) {
         JButton btn = new JButton(text) {
+
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                         RenderingHints.VALUE_ANTIALIAS_ON);
-                boolean hover   = getModel().isRollover();
-                boolean enabled = isEnabled();
-                Color top = hover
-                        ? new Color(150, 100, 35, 240)
-                        : new Color(100,  58, 14, enabled ? 220 : 100);
-                Color bot = hover
-                        ? new Color(110,  72, 20, 240)
-                        : new Color( 70,  38,  6, enabled ? 220 : 100);
-                g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bot));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
-                g2.setStroke(new BasicStroke(2f));
-                g2.setColor(new Color(200, 155, 60, enabled ? 220 : 80));
-                g2.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 14, 14);
-                g2.setStroke(new BasicStroke(1f));
-                g2.setColor(new Color(255, 210, 100, enabled ? 80 : 30));
-                g2.drawRoundRect(3, 3, getWidth()-6, getHeight()-6, 10, 10);
-                g2.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 8));
+
+                boolean hover = getModel().isRollover();
+                boolean press = getModel().isPressed();
+
+                Color top = hover ? new Color(170,110,40) : new Color(120,70,20);
+                Color bot = hover ? new Color(120,80,30)  : new Color(80,40,10);
+
+                if (press) {
+                    top = top.darker();
+                    bot = bot.darker();
+                }
+
+                g2.setPaint(new GradientPaint(0,0,top,0,getHeight(),bot));
+                g2.fillRoundRect(0,0,getWidth(),getHeight(),16,16);
+
+                // Glow effect
+                if (hover) {
+                    g2.setColor(new Color(255, 215, 120, 80));
+                    g2.setStroke(new BasicStroke(3f));
+                    g2.drawRoundRect(2,2,getWidth()-4,getHeight()-4,16,16);
+                }
+
+                g2.setColor(new Color(220,180,90));
+                g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2,16,16);
+
+                g2.setFont(new Font("Serif", Font.BOLD, 12));
                 FontMetrics fm = g2.getFontMetrics();
-                int tx = (getWidth()  - fm.stringWidth(getText())) / 2;
-                int ty = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
-                g2.setColor(new Color(0, 0, 0, 80));
-                g2.drawString(getText(), tx + 1, ty + 1);
-                g2.setColor(enabled ? new Color(245, 220, 155) : new Color(180, 145, 90));
+
+                int tx = (getWidth()-fm.stringWidth(getText()))/2;
+                int ty = (getHeight()+fm.getAscent())/2 - 2;
+
+                g2.setColor(Color.BLACK);
+                g2.drawString(getText(), tx+1, ty+1);
+
+                g2.setColor(new Color(255,230,170));
                 g2.drawString(getText(), tx, ty);
+
                 g2.dispose();
             }
         };
+
         btn.setOpaque(false);
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setPreferredSize(new Dimension(140, 38));
+
         return btn;
     }
 
