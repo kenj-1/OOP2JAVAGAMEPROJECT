@@ -1,5 +1,5 @@
 package encantadia;
-
+import encantadia.ui.effects.CursorTrailEffect;
 import javax.swing.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -16,7 +16,6 @@ public class ScreenManager {
     public static void register(JFrame frame) {
         frames.add(frame);
 
-        // ✅ If already fullscreen when this frame opens, apply it immediately
         if (fullscreen) {
             frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
         }
@@ -31,6 +30,24 @@ public class ScreenManager {
         });
 
         frame.setFocusable(true);
+
+        // =============================
+        // ✨ CURSOR TRAIL EFFECT (GLOBAL)
+        // =============================
+        CursorTrailEffect trail = new CursorTrailEffect();
+
+        frame.setGlassPane(trail);
+        trail.setVisible(true);
+
+        // Ensure it always fits the frame
+        trail.setSize(frame.getSize());
+
+        frame.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                trail.setSize(frame.getSize());
+            }
+        });
     }
 
     public static void unregister(JFrame frame) {

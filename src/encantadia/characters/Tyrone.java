@@ -15,16 +15,19 @@ public class Tyrone extends Character {
                         "the truth behind Joygen's disappearance, embarking on a journey that would test his courage, skill, and heart."
         );
 
-        // Skill 1: Fire Blaze — no effect
         skills.add(new Skill("Fire Blaze", 260, 340, 0,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 2: Fire Beam — no effect
         skills.add(new Skill("Fire Beam", 360, 450, 2,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 3: Fire Burst — always throws additional 250 damage
+        // FIX: % damage simulated as flat bonus
         skills.add(new Skill("Fire Burst", 525, 650, 3,
-                Skill.EffectType.EXTRA_DAMAGE, 250, 1.0));
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.EXTRA_DAMAGE,
+                100,
+                1.0));
     }
 }

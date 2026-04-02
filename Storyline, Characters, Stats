@@ -42,7 +42,7 @@ Dirk, Guardian of Growth and Harvest
 Base HP: 5000 HP
 Skill 1: Bato Dela Rosa – Damage: 230–310 | Cooldown: 0
 Skill 2: Ding ang Bato! – Damage: 300–400 | Cooldown: 2 turns
-Skill 3: Linog – Damage: 500–650 | Cooldown: 3 turns | Ultimate Effect: Reduces enemy damage by 40% next turn
+Skill 3: Linog – Damage: 500–650 | Cooldown: 3 turns | Ultimate Effect: Reduces enemy's turn damage by 40%
 
 
 Makelan Shere, Devourer of the Crimson Bloom
@@ -58,7 +58,7 @@ Tyrone is a Fire Sang’gre who was born in the kingdom of Hathoria and dreams o
 Base HP: 5000HP
 Skill 1: Fire Blaze – Damage: 260–340 | Cooldown: 0
 Skill 2: Fire Beam – Damage: 360–450 | Cooldown: 2 turns
-Skill 3: Fire Burst – Damage: 525–650 | Cooldown: 3 turns | Ultimate Effect: Throws additional damage of 250
+Skill 3: Fire Burst – Damage: 525–650 | Cooldown: 3 turns | Ultimate Effect: Throws a burning effect, throws additional damage of 4% of enemy's max hp
 
 (Main):
 Dea (Air)
@@ -75,7 +75,7 @@ Gifted with flames born from starlit embers, Flamara’s fire burns with a fierc
 Base HP: 5000 HP
 Skill 1: Fire Ball – Damage: 280–360 | Cooldown: 0
 Skill 2: Flame Burst – Damage: 380–480 | Cooldown: 2 turns
-Skill 3: Inferno Strike – Damage: 560–700 | Cooldown: 3 turns | Ultimate Effect: Throws additional damage of 300
+Skill 3: Inferno Strike – Damage: 560–700 | Cooldown: 3 turns | Ultimate Effect: Has a 40% chance of bursting enemy of 5% of enemy's lost hp damage output, however she loses 50 points of her health
 
 Tera (Earth)
 Tera was born from the first mountain stone kissed by dawn, embodying endurance and the unyielding spirit of the land. With Jelian missing, the earth cries out in instability, yet Tera’s steadfast nature ensures she remains the shield that guards against total collapse.
@@ -89,6 +89,6 @@ Adamus (Water)
 Adamus, guardian of rivers and lakes, carries the voice of the oceans themselves. Shaped by betrayal and loss, he channels both compassion and power. The oceans wail in response to Joygen’s absence, yet Adamus remains resolute, determined to restore harmony to water and fire alike.
 
 Base HP: 5000 HP
-Skill 1: Water Spear – Heal: 220–300 | Cooldown: 0
-Skill 2: Ocean Wave – Heal: 300–450 | Cooldown: 2 turns
-Skill 3: Tsunami Blast – Heal: 600–650 | Cooldown: 3 turns | Ultimate Effect: Decreases all skill turns by 1, except skill 1
+Skill 1: Water Spear – Damage: 220–300 | Cooldown: 0
+Skill 2: Ocean Wave – Damage: 300–450 | Cooldown: 2 turns
+Skill 3: Tsunami Curse – Damage: 600–650 | Cooldown: 3 turns | Ultimate Effect: Applies a curse on enemy and has a 40% chance that the enemy misses the attack

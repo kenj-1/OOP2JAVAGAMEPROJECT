@@ -18,16 +18,19 @@ public class Mary extends Character {
                                 """
         );
 
-        // Skill 1: Luha — no effect
+
         skills.add(new Skill("Luha", 220, 300, 0,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 2: Flood Control — no effect
         skills.add(new Skill("Flood Control", 320, 420, 2,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 3: Tsunami — 50% chance to steal a turn
         skills.add(new Skill("Tsunami", 525, 650, 3,
-                Skill.EffectType.TURN_STEAL, 1, 0.50));
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.TURN_STEAL,
+                1,
+                0.50));
     }
 }

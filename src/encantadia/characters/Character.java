@@ -25,12 +25,23 @@ public abstract class Character {
         this.skills    = new ArrayList<>();
     }
 
+    public void increaseMaxHP(int amount) {
+        maxHP += amount;
+        currentHP += amount;
+    }
+
+    public void addSkill(Skill skill) {
+        skills.add(skill);
+    }
+
     public void takeDamage(int damage) {
+        damage = Math.max(0, damage);
         currentHP -= damage;
         if (currentHP < 0) currentHP = 0;
     }
 
     public void heal(int amount) {
+        amount = Math.max(0, amount);
         currentHP += amount;
         if (currentHP > maxHP) currentHP = maxHP;
     }
@@ -39,9 +50,19 @@ public abstract class Character {
         return currentHP > 0;
     }
 
+    @Override
+    public String toString() {
+        return name + " (" + currentHP + "/" + maxHP + " HP)";
+    }
+
+    public void reset() {
+        currentHP = maxHP;
+    }
     // ── Getters ──────────────────────────────────────────────
 
-    public List<Skill> getSkills()  { return skills; }
+    public List<Skill> getSkills() {
+        return new ArrayList<>(skills);
+    }
     public String getName()         { return name; }
     public String getTitle()        { return title; }
     public String getBackstory()    { return backstory; }

@@ -15,17 +15,18 @@ public class MakelanShere extends Character {
                         "Each strike feeds his power, yet every overwhelming assault demands a price from his own flesh."
         );
 
-        // Skill 1: Lead Heel — no effect
         skills.add(new Skill("Lead Heel", 240, 320, 0,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 2: Savor Thy Flesh — no effect
         skills.add(new Skill("Savor Thy Flesh", 340, 450, 2,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 3: Gouged Petunia — 15% recoil damage (always triggers)
-        // Secondary: reduces own damage by 30% for 2 turns (handled in TurnManager/StatusEffect)
         skills.add(new Skill("Gouged Petunia", 550, 700, 3,
-                Skill.EffectType.RECOIL, 0.15, 1.0));
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.RECOIL,
+                0.15,
+                1.0));
     }
 }

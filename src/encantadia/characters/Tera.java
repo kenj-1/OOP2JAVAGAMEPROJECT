@@ -15,16 +15,19 @@ public class Tera extends Character {
                         "nature ensures she remains the shield that guards against total collapse."
         );
 
-        // Skill 1: Rock Smash — no effect
         skills.add(new Skill("Rock Smash", 230, 310, 0,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 2: Earthquake — no effect
         skills.add(new Skill("Earthquake", 300, 380, 2,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 3: Nature's Wrath — always heals self for 300 HP after dealing damage
+        // FIX: heal properly
         skills.add(new Skill("Nature's Wrath", 500, 650, 3,
-                Skill.EffectType.HEAL, 300, 1.0));
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.HEAL,
+                450,
+                1.0));
     }
 }

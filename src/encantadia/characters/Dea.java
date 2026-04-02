@@ -19,16 +19,18 @@ public class Dea extends Character {
                         "only silence where once they carried guidance."
         );
 
-        // Skill 1: Wind Slash — no effect
         skills.add(new Skill("Wind Slash", 220, 300, 0,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 2: Storm Fury — no effect
         skills.add(new Skill("Storm Fury", 320, 400, 2,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 3: Whirlwind — 45% chance to increase opponent's cooldown by 1 turn
         skills.add(new Skill("Whirlwind", 500, 620, 3,
-                Skill.EffectType.COOLDOWN_INCREASE, 1, 0.45));
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.COOLDOWN_INCREASE,
+                1,
+                0.45));
     }
 }

@@ -9,27 +9,20 @@ import java.util.Random;
 
 public class EnemyAI {
 
-    public static int chooseSkill(Character enemy, CooldownManager cooldownManager) {
+    private static final Random rand = new Random();
 
-        List<Integer> availableSkills = new ArrayList<>();
+    public static int chooseSkill(Character enemy, CooldownManager cm) {
+
+        List<Integer> available = new ArrayList<>();
 
         for (int i = 0; i < enemy.getSkills().size(); i++) {
-
-            if (!cooldownManager.isOnCooldown(enemy, i)) {
-                availableSkills.add(i);
+            if (!cm.isOnCooldown(enemy, i)) {
+                available.add(i);
             }
-
         }
 
-        if (availableSkills.isEmpty()) {
-            return 0; // fallback to basic attack
-        }
+        if (available.isEmpty()) return 0;
 
-        Random rand = new Random();
-        if(availableSkills.isEmpty()){
-            return 0;
-        }
-
-        return availableSkills.get(rand.nextInt(availableSkills.size()));
+        return available.get(rand.nextInt(available.size()));
     }
 }

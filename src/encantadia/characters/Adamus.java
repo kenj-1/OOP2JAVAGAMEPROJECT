@@ -16,16 +16,20 @@ public class Adamus extends Character {
                         "to water and fire alike."
         );
 
-        // Skill 1: Water Spear — heals ally, no effect
+        // FIX: These are DAMAGE, not HEAL
         skills.add(new Skill("Water Spear", 220, 300, 0,
-                Skill.SkillType.HEAL, Skill.EffectType.NONE, 0, 0));
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.NONE, 0, 0));
 
-        // Skill 2: Ocean Wave — heals ally, no effect
         skills.add(new Skill("Ocean Wave", 300, 450, 2,
-                Skill.SkillType.HEAL, Skill.EffectType.NONE, 0, 0));
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.NONE, 0, 0));
 
-        // Skill 3: Tsunami Blast — heals ally, then reduces all skill cooldowns by 1 (except Skill 1)
-        skills.add(new Skill("Tsunami Blast", 600, 650, 3,
-                Skill.SkillType.DAMAGE, Skill.EffectType.COOLDOWN_REDUCTION, 1, 1.0));
+        skills.add(new Skill("Tsunami Curse", 600, 650, 3,
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.MISS_CHANCE,
+                0.45,
+                1.0));
+
     }
 }

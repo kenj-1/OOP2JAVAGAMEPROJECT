@@ -13,15 +13,18 @@ public class Dirk extends Character {
                 "Emerging from the mountains, Dirk protects the land with unwavering devotion."
         );
 
-        // ✅ Fix 2: Use correct 7-arg constructor with EffectType enum
         skills.add(new Skill("Bato Dela Rosa", 230, 310, 0,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
         skills.add(new Skill("Ding ang Bato!", 300, 400, 2,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
         skills.add(new Skill("Linog", 500, 650, 3,
-                Skill.EffectType.DAMAGE_REDUCTION, 0.65, 1.0));
-        //                                         ^^^^ 65% reduction, 100% proc chance
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.DAMAGE_REDUCTION,
+                0.40,
+                1.0));
     }
 }

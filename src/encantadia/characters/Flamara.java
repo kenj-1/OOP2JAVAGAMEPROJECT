@@ -15,16 +15,19 @@ public class Flamara extends Character {
                         "the goddess who once taught her the true mastery of fire."
         );
 
-        // Skill 1: Fire Ball — no effect
         skills.add(new Skill("Fire Ball", 280, 360, 0,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 2: Flame Burst — no effect
         skills.add(new Skill("Flame Burst", 380, 480, 2,
+                Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
 
-        // Skill 3: Inferno Strike — always throws additional 300 damage
+        // FIX: replaced EXECUTE → EXTRA_DAMAGE
         skills.add(new Skill("Inferno Strike", 560, 700, 3,
-                Skill.EffectType.EXTRA_DAMAGE, 300, 1.0));
+                Skill.SkillType.DAMAGE,
+                Skill.EffectType.EXTRA_DAMAGE,
+                200,
+                0.40));
     }
 }
