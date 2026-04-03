@@ -1,47 +1,54 @@
 package encantadia.ui.frames.battleModeFrames;
 
-import encantadia.BackstoryShowcase;
 import encantadia.ScreenManager;
 import encantadia.battle.ai.EnemyAI;
 import encantadia.battle.arcade.ArcadeModeManager;
 import encantadia.battle.engine.TurnManager;
 import encantadia.battle.result.TurnResult;
 import encantadia.battle.skill.Skill;
+import encantadia.characters.*;
 import encantadia.characters.Character;
-import encantadia.story.CharacterStories;
+import encantadia.ui.frames.ArcadeTowerFrame;
 import encantadia.ui.frames.ArcadeVictoryFrame;
 import encantadia.ui.frames.MainMenuFrame;
 
 import javax.swing.*;
-import javax.swing.border.LineBorder;
 import java.awt.*;
+import java.awt.event.*;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
- * ArcadeModeBattleFrame
+ * ArcadeModeBattleFrame — one instance = one fight.
  *
- * Visual architecture mirrors PVEBattleFrame exactly:
- *   • Same colour palette, same top bar / side panels / log / skill bar
- *   • Same refreshUI / tintBar / refreshCdRow / updateTurnState pattern
- *
- * Arcade-specific additions:
- *   • Enemy counter in top bar ("Enemy 3 of 7")
- *   • Final boss gets a purple highlight treatment
- *   • No round system — single HP pool per fight
- *   • Upgrade flow between fights (HP boost at tier 3, ultimate at tier 6)
- *   • Defeat → Main Menu; Victory over all → ArcadeVictoryFrame
+ * Key features:
+ *   • Full-screen pixel-art cave background
+ *   • BattleCanvas paints the full HUD via Graphics2D (portrait frames,
+ *     HP bars, name pills, turn indicator, enemy counter)
+ *   • Pill-shaped skill buttons bottom-left, mini battle log bottom-center
+ *   • Custom in-frame overlays for ALL reward / defeat popups
+ *   • Randomized 3-skill ultimate draft: picks 3 "tier-3" skills from the
+ *     global roster EXCLUDING the player's own ultimate
  */
 public class ArcadeModeBattleFrame extends JFrame {
 
-    // ── Constants ─────────────────────────────────────────────
-    private static final int ENEMY_TURN_DELAY = 1100;
+    // ── Resources ─────────────────────────────────────────────
+    private static final String BG_PATH          = "/resources/backgroundArcade.png";
+    private static final int    ENEMY_TURN_DELAY  = 1100;
 
-    // ── Colour palette ────────────────────────────────────────
-    private static final String BATTLE_BG = "/resources/backgroundArcade.png";
-    private static final Color BG_PANEL = new Color(0x22,0x1C,0x14,200); // was 0x22,0x1C,0x14
-    private static final Color BG_LOG   = new Color(0x10,0x0D,0x07,210); // was 0x10,0x0D,0x07
-    private static final Color BORDER_CLR = new Color(0xC8, 0xA0, 0x28);
+    private static final String[] FRAME_IMGS = {
+            "/resources/tyroneFrame (1).png", "/resources/elanFrame (1).png",
+            "/resources/claireFrame (1).png", "/resources/dirkFrame (1).png",
+            "/resources/flamaraFrame (1).png", "/resources/deaFrame (1).png",
+            "/resources/adamusFrame (1).png",  "/resources/teraFrame (1).png"
+    };
+    private static final String[] CHAR_NAMES = {
+            "Tyrone","Elan","Claire","Dirk","Flamara","Dea","Adamus","Tera"
+    };
+
+    // ── Colours ────────────────────────────────────────────────
     private static final Color PLAYER_CLR = new Color(0x2E, 0x8B, 0x57);
     private static final Color ENEMY_CLR  = new Color(0xB0, 0x2A, 0x2A);
     private static final Color BOSS_CLR   = new Color(0xAA, 0x00, 0xFF);
@@ -54,329 +61,51 @@ public class ArcadeModeBattleFrame extends JFrame {
 
     // ── Characters & engine ───────────────────────────────────
     private final Character         playerCharacter;
-    private Character               enemyCharacter;
-    private TurnManager             turnManager;
+    private final Character         enemyCharacter;
     private final ArcadeModeManager arcadeManager;
+    private TurnManager       turnManager;
 
-    // ── State ─────────────────────────────────────────────────
+    // processingTurn is ALWAYS false on construction — the per-instance fix
     private volatile boolean processingTurn = false;
 
-    // ── UI refs ───────────────────────────────────────────────
-    private JLabel       enemyCountLabel;
-    private JLabel       playerHPLabel, enemyHPLabel;
-    private JProgressBar playerHPBar,   enemyHPBar;
+    // ── Layered pane refs ─────────────────────────────────────
+    private BattleCanvas battleCanvas;
+    private JPanel       skillsLayer;
+    private JPanel       overlayLayer;
     private JTextArea    battleLog;
     private JButton[]    skillBtns = new JButton[4];
     private JLabel[]     cdLabels  = new JLabel[4];
-    private JLabel       turnIndicator;
-    private JPanel       skillBarInner; // rebuilt when ultimate is unlocked
-
-    // Refs needed to update enemy side between fights
-    private JPanel enemyPanel;
-    private JLabel enemyRoleLabel, enemyNameLabel, enemyTitleLabel;
 
     // ══════════════════════════════════════════════════════════
-    //  Constructors
+    //  Constructor
     // ══════════════════════════════════════════════════════════
-
-    public ArcadeModeBattleFrame(Character player, ArcadeModeManager arcadeManager) {
+    public ArcadeModeBattleFrame(Character player, ArcadeModeManager manager) {
         this.playerCharacter = player;
-        this.arcadeManager   = arcadeManager;
-        this.enemyCharacter  = arcadeManager.getCurrentEnemy();
+        this.arcadeManager   = manager;
+        this.enemyCharacter  = manager.getCurrentEnemy();
 
-        setTitle("Arcade Mode — " + player.getName());
-        setSize(1024, 768);
-        setMinimumSize(new Dimension(1024, 768));
-        setLocationRelativeTo(null);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
-
-        buildUI();
-        setVisible(true);
-        ScreenManager.register(this);
-
-        startFight(); // kick off the first battle
-    }
-
-    /** Backward-compat single-arg constructor */
-    public ArcadeModeBattleFrame(Character player) {
-        this(player, new ArcadeModeManager(player));
-    }
-
-    @Override
-    public void dispose() {
-        ScreenManager.unregister(this);
-        super.dispose();
-    }
-
-    // ══════════════════════════════════════════════════════════
-    //  UI Construction  (mirrors PVEBattleFrame exactly)
-    // ══════════════════════════════════════════════════════════
-
-    private void buildUI() {
-        JLayeredPane lp = new JLayeredPane();
-        lp.setLayout(null);
-        setContentPane(lp);
-
-        // Background image
-        JPanel bg = new JPanel(){
-            private final Image img;
-            { URL u=getClass().getResource(BATTLE_BG); img=u!=null?new ImageIcon(u).getImage():null; setOpaque(true); setBackground(Color.BLACK); }
-            @Override protected void paintComponent(Graphics g){super.paintComponent(g);if(img!=null){Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);g2.drawImage(img,0,0,getWidth(),getHeight(),null);g2.dispose();}}
-        };
-        lp.add(bg, JLayeredPane.DEFAULT_LAYER);
-
-        // Existing content on top
-        JPanel content = new JPanel(new BorderLayout());
-        content.setOpaque(false);
-        content.add(buildTopBar(), BorderLayout.NORTH);
-        content.add(buildMainArea(), BorderLayout.CENTER);
-        content.add(buildSkillBar(), BorderLayout.SOUTH);
-        lp.add(content, JLayeredPane.PALETTE_LAYER);
-
-        lp.addComponentListener(new java.awt.event.ComponentAdapter(){
-            @Override public void componentResized(java.awt.event.ComponentEvent e){
-                int W=lp.getWidth(),H=lp.getHeight();
-                bg.setBounds(0,0,W,H); content.setBounds(0,0,W,H);
-            }
-        });
-    }
-
-    // ── Top bar ───────────────────────────────────────────────
-    private JPanel buildTopBar() {
-        JPanel bar = new JPanel(new BorderLayout());
-        bar.setBackground(new Color(0x0C, 0x09, 0x05));
-        bar.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, BORDER_CLR));
-        bar.setPreferredSize(new Dimension(0, 62));
-
-        JPanel left  = new JPanel(); left.setOpaque(false);  left.setPreferredSize(new Dimension(120, 0));
-        JPanel right = new JPanel(); right.setOpaque(false); right.setPreferredSize(new Dimension(120, 0));
-
-        JPanel centre = new JPanel();
-        centre.setOpaque(false);
-        centre.setLayout(new BoxLayout(centre, BoxLayout.Y_AXIS));
-
-        JLabel arcadeTitle = new JLabel("⚔  ARCADE MODE", SwingConstants.CENTER);
-        arcadeTitle.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 22));
-        arcadeTitle.setForeground(GOLD);
-        arcadeTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        enemyCountLabel = new JLabel("", SwingConstants.CENTER);
-        enemyCountLabel.setFont(new Font("Serif", Font.ITALIC, 12));
-        enemyCountLabel.setForeground(new Color(0xA0, 0x88, 0x50));
-        enemyCountLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        centre.add(Box.createVerticalGlue());
-        centre.add(arcadeTitle);
-        centre.add(enemyCountLabel);
-        centre.add(Box.createVerticalGlue());
-
-        bar.add(left,   BorderLayout.WEST);
-        bar.add(centre, BorderLayout.CENTER);
-        bar.add(right,  BorderLayout.EAST);
-        return bar;
-    }
-
-    // ── Main area ─────────────────────────────────────────────
-    private JPanel buildMainArea() {
-        JPanel area = new JPanel(new GridBagLayout());
-        area.setOpaque(false);
-
-        GridBagConstraints g = new GridBagConstraints();
-        g.weighty = 1.0;
-        g.weightx = 1.0; // ✅ ADD THIS BEFORE FIRST USE
-
-        g.gridx = 0; g.weightx = 0.26;
-        g.gridx = 1; g.weightx = 0.48;
-        g.gridx = 2; g.weightx = 0.26;
-
-        g.fill = GridBagConstraints.BOTH; g.weighty = 1.0;
-
-        g.gridx = 0; g.weightx = 0.26; g.insets = new Insets(10, 10, 6, 6);
-        area.add(buildPlayerPanel(), g);
-
-        g.gridx = 1; g.weightx = 0.48; g.insets = new Insets(10, 0, 6, 0);
-        area.add(buildLogPanel(), g);
-
-        g.gridx = 2; g.weightx = 0.26; g.insets = new Insets(10, 6, 6, 10);
-        enemyPanel = buildEnemyPanel();
-        area.add(enemyPanel, g);
-
-        return area;
-    }
-
-    private JPanel buildPlayerPanel() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(BG_PANEL);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(PLAYER_CLR, 1),
-                BorderFactory.createEmptyBorder(12, 14, 14, 14)));
-
-        panel.add(makePortrait(playerCharacter));
-        panel.add(Box.createVerticalStrut(6));
-
-        JLabel roleTag = makeAlignedLabel("PLAYER", new Font("SansSerif", Font.BOLD, 10), PLAYER_CLR);
-        JLabel nameLbl = makeAlignedLabel(playerCharacter.getName(), new Font("Serif", Font.BOLD, 14), CREAM);
-        JLabel titlLbl = makeAlignedLabel(playerCharacter.getTitle(), new Font("Serif", Font.ITALIC, 9),
-                new Color(0xA0, 0x88, 0x50));
-
-        playerHPBar = makeHPBar(playerCharacter, PLAYER_CLR);
-        playerHPLabel = makeAlignedLabel("", new Font("SansSerif", Font.PLAIN, 11), LOG_FG);
-
-        turnIndicator = makeAlignedLabel("▶ Your Turn", new Font("Serif", Font.BOLD | Font.ITALIC, 12), GOLD);
-
-        panel.add(roleTag);
-        panel.add(Box.createVerticalStrut(2));
-        panel.add(nameLbl);
-        panel.add(Box.createVerticalStrut(2));
-        panel.add(titlLbl);
-        panel.add(Box.createVerticalStrut(8));
-        panel.add(playerHPBar);
-        panel.add(Box.createVerticalStrut(4));
-        panel.add(playerHPLabel);
-        panel.add(Box.createVerticalStrut(8));
-        panel.add(turnIndicator);
-        panel.add(Box.createVerticalGlue());
-        return panel;
-    }
-
-    private JPanel buildEnemyPanel() {
-        boolean isBoss = arcadeManager.isFinalBoss();
-        Color   ec     = isBoss ? BOSS_CLR : ENEMY_CLR;
-
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(BG_PANEL);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(ec, 1),
-                BorderFactory.createEmptyBorder(12, 14, 14, 14)));
-
-        panel.add(makePortrait(enemyCharacter));
-        panel.add(Box.createVerticalStrut(6));
-
-        enemyRoleLabel = makeAlignedLabel(isBoss ? "⚡ FINAL BOSS" : "ENEMY",
-                new Font("SansSerif", Font.BOLD, 10), ec);
-        enemyNameLabel  = makeAlignedLabel(enemyCharacter.getName(),  new Font("Serif", Font.BOLD, 14), CREAM);
-        enemyTitleLabel = makeAlignedLabel(enemyCharacter.getTitle(), new Font("Serif", Font.ITALIC, 9),
-                new Color(0xA0, 0x88, 0x50));
-
-        enemyHPBar   = makeHPBar(enemyCharacter, ec);
-        enemyHPLabel = makeAlignedLabel("", new Font("SansSerif", Font.PLAIN, 11), LOG_FG);
-
-        panel.add(enemyRoleLabel);
-        panel.add(Box.createVerticalStrut(2));
-        panel.add(enemyNameLabel);
-        panel.add(Box.createVerticalStrut(2));
-        panel.add(enemyTitleLabel);
-        panel.add(Box.createVerticalStrut(8));
-        panel.add(enemyHPBar);
-        panel.add(Box.createVerticalStrut(4));
-        panel.add(enemyHPLabel);
-        panel.add(Box.createVerticalGlue());
-        return panel;
-    }
-
-    private JPanel buildLogPanel() {
-        battleLog = new JTextArea();
-        battleLog.setFont(new Font("Monospaced", Font.PLAIN, 11));
-        battleLog.setForeground(LOG_FG);
-        battleLog.setBackground(BG_LOG);
-        battleLog.setEditable(false);
-        battleLog.setLineWrap(true);
-        battleLog.setWrapStyleWord(true);
-        battleLog.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-
-        JScrollPane scroll = new JScrollPane(battleLog,
-                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.setBorder(new LineBorder(BORDER_CLR, 1));
-        scroll.getViewport().setBackground(BG_LOG);
-
-        JPanel wrap = new JPanel(new BorderLayout());
-        wrap.setOpaque(false);
-        wrap.add(scroll, BorderLayout.CENTER);
-        return wrap;
-    }
-
-    // ── Skill bar (up to 4 slots; slot 4 unlocked at tier 6) ──
-    private JPanel buildSkillBar() {
-        JPanel wrapper = new JPanel(new BorderLayout());
-        wrapper.setBackground(new Color(0x0C, 0x09, 0x05));
-        wrapper.setBorder(BorderFactory.createMatteBorder(2, 0, 0, 0, BORDER_CLR));
-        wrapper.setPreferredSize(new Dimension(0, 100));
-
-        skillBarInner = new JPanel(new GridLayout(1, 4, 8, 0));
-        skillBarInner.setBackground(new Color(0x0C, 0x09, 0x05));
-        skillBarInner.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
-
-        rebuildSkillSlots();
-        wrapper.add(skillBarInner, BorderLayout.CENTER);
-        return wrapper;
-    }
-
-    private void rebuildSkillSlots() {
-        skillBarInner.removeAll();
-        List<Skill> skills = playerCharacter.getSkills();
-
-        for (int i = 0; i < 4; i++) {
-            JPanel slot = new JPanel(new BorderLayout(0, 3));
-            slot.setOpaque(false);
-
-            if (i < skills.size()) {
-                final int si = i;
-                skillBtns[i] = makeSkillButton(skills.get(i).getName(), PLAYER_CLR);
-                skillBtns[i].setEnabled(false);
-                skillBtns[i].addActionListener(e -> onPlayerSkill(si));
-                cdLabels[i] = makeCdLabel("READY", GREEN_RDY);
-            } else {
-                skillBtns[i] = makeSkillButton("—", new Color(0x40, 0x30, 0x18));
-                skillBtns[i].setEnabled(false);
-                cdLabels[i] = makeCdLabel("LOCKED", new Color(0x60, 0x50, 0x30));
-            }
-
-            slot.add(skillBtns[i], BorderLayout.CENTER);
-            slot.add(cdLabels[i],  BorderLayout.SOUTH);
-            skillBarInner.add(slot);
+        if (enemyCharacter == null) {
+            SwingUtilities.invokeLater(() -> new ArcadeVictoryFrame(player));
+            return;
         }
-        skillBarInner.revalidate();
-        skillBarInner.repaint();
-    }
 
-    // ══════════════════════════════════════════════════════════
-    //  Battle flow
-    // ══════════════════════════════════════════════════════════
-
-    private void startFight() {
-        enemyCharacter = arcadeManager.getCurrentEnemy();
-        if (enemyCharacter == null) { triggerVictory(); return; }
+        playerCharacter.reset();
+        enemyCharacter.reset();
+        this.turnManager = new TurnManager(playerCharacter, enemyCharacter);
 
         boolean isBoss = arcadeManager.isFinalBoss();
         int idx   = arcadeManager.getCurrentIndex() + 1;
         int total = arcadeManager.getTotalEnemies();
 
-        enemyCountLabel.setText(isBoss
-                ? "⚡  FINAL BOSS  ⚡"
-                : "Enemy  " + idx + "  of  " + total);
+        setTitle("Arcade Mode — " + player.getName() + " vs " + enemyCharacter.getName());
+        setSize(1024, 768);
+        setMinimumSize(new Dimension(800, 600));
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        Color ec = isBoss ? BOSS_CLR : ENEMY_CLR;
-        enemyPanel.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(ec, 1),
-                BorderFactory.createEmptyBorder(12, 14, 14, 14)));
-        enemyRoleLabel.setText(isBoss ? "⚡ FINAL BOSS" : "ENEMY");
-        enemyRoleLabel.setForeground(ec);
-        enemyNameLabel.setText(enemyCharacter.getName());
-        enemyTitleLabel.setText(enemyCharacter.getTitle());
-
-        playerCharacter.reset();
-        enemyCharacter.reset();
-
-        playerHPBar.setMaximum(playerCharacter.getMaxHP());
-        enemyHPBar.setMaximum(enemyCharacter.getMaxHP());
-
-        turnManager = new TurnManager(playerCharacter, enemyCharacter);
-
-        // ❌ REMOVE THIS (causing error)
-        // turnManager.setTarget(enemyCharacter);
+        buildUI(isBoss, idx, total);
+        setVisible(true);
+        ScreenManager.register(this);
 
         refreshUI();
         rebuildSkillSlots();
@@ -389,35 +118,163 @@ public class ArcadeModeBattleFrame extends JFrame {
         log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
-    // ── Turn logic ────────────────────────────────────────────
+    public ArcadeModeBattleFrame(Character player) {
+        this(player, new ArcadeModeManager(player));
+    }
+
+    @Override
+    public void dispose() { ScreenManager.unregister(this); super.dispose(); }
+
+    // ══════════════════════════════════════════════════════════
+    //  UI — JLayeredPane
+    // ══════════════════════════════════════════════════════════
+    private void buildUI(boolean isBoss, int idx, int total) {
+        JLayeredPane lp = new JLayeredPane();
+        lp.setLayout(null);
+        setContentPane(lp);
+
+        BgPanel bg = new BgPanel(BG_PATH);
+        lp.add(bg, JLayeredPane.DEFAULT_LAYER);
+
+        battleCanvas = new BattleCanvas(isBoss, idx, total);
+        lp.add(battleCanvas, JLayeredPane.PALETTE_LAYER);
+
+        skillsLayer = new JPanel(null);
+        skillsLayer.setOpaque(false);
+        buildSkillsLayer();
+        lp.add(skillsLayer, JLayeredPane.MODAL_LAYER);
+
+        overlayLayer = new JPanel(null);
+        overlayLayer.setOpaque(false);
+        overlayLayer.setVisible(false);
+        lp.add(overlayLayer, JLayeredPane.POPUP_LAYER);
+
+        lp.addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                int W = lp.getWidth(), H = lp.getHeight();
+                if (W == 0 || H == 0) return;
+                bg.setBounds(0, 0, W, H);
+                battleCanvas.setBounds(0, 0, W, H);
+                skillsLayer.setBounds(0, 0, W, H);
+                overlayLayer.setBounds(0, 0, W, H);
+                layoutSkillsLayer(W, H);
+            }
+        });
+    }
+
+    // ── Skill buttons + mini log ──────────────────────────────
+    private void buildSkillsLayer() {
+        JPanel skillPanel = new JPanel();
+        skillPanel.setOpaque(false);
+        skillPanel.setLayout(new BoxLayout(skillPanel, BoxLayout.Y_AXIS));
+
+        for (int i = 0; i < 4; i++) {
+            final int si = i;
+            skillBtns[i] = makePillButton("—",
+                    new Color(0x70, 0x14, 0x14), new Color(0xFF, 0x99, 0x99));
+            skillBtns[i].setEnabled(false);
+            skillBtns[i].addActionListener(e -> onPlayerSkill(si));
+            cdLabels[i] = new JLabel("LOCKED", SwingConstants.CENTER);
+            cdLabels[i].setFont(new Font("SansSerif", Font.BOLD, 9));
+            cdLabels[i].setForeground(new Color(0x60, 0x50, 0x30));
+            JPanel slot = new JPanel(new BorderLayout(0, 2));
+            slot.setOpaque(false);
+            slot.add(skillBtns[i], BorderLayout.CENTER);
+            slot.add(cdLabels[i], BorderLayout.SOUTH);
+            skillPanel.add(slot);
+            if (i < 3) skillPanel.add(Box.createVerticalStrut(4));
+        }
+        skillsLayer.add(skillPanel);
+        skillsLayer.putClientProperty("skills", skillPanel);
+
+        battleLog = new JTextArea();
+        battleLog.setFont(new Font("Monospaced", Font.PLAIN, 10));
+        battleLog.setForeground(LOG_FG);
+        battleLog.setOpaque(false);
+        battleLog.setEditable(false);
+        battleLog.setLineWrap(true);
+        battleLog.setWrapStyleWord(true);
+
+        JScrollPane scroll = new JScrollPane(battleLog,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.setBorder(null);
+
+        JPanel logHolder = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(new Color(0, 0, 0, 150));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                g2.setColor(new Color(0xC8, 0xA0, 0x28, 70));
+                g2.setStroke(new BasicStroke(1));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
+                g2.dispose(); super.paintComponent(g);
+            }
+        };
+        logHolder.setOpaque(false);
+        logHolder.add(scroll, BorderLayout.CENTER);
+        skillsLayer.add(logHolder);
+        skillsLayer.putClientProperty("log", logHolder);
+    }
+
+    private void rebuildSkillSlots() {
+        List<Skill> skills = playerCharacter.getSkills();
+        for (int i = 0; i < 4; i++) {
+            if (skillBtns[i] == null) continue;
+            if (i < skills.size()) {
+                skillBtns[i].setText(skills.get(i).getName());
+                skillBtns[i].setEnabled(false);
+                cdLabels[i].setText("READY");
+                cdLabels[i].setForeground(GREEN_RDY);
+            } else {
+                skillBtns[i].setText("—");
+                skillBtns[i].setEnabled(false);
+                cdLabels[i].setText("LOCKED");
+                cdLabels[i].setForeground(new Color(0x60, 0x50, 0x30));
+            }
+        }
+        skillsLayer.revalidate();
+        skillsLayer.repaint();
+    }
+
+    private void layoutSkillsLayer(int W, int H) {
+        JPanel sp = (JPanel) skillsLayer.getClientProperty("skills");
+        JPanel lh = (JPanel) skillsLayer.getClientProperty("log");
+        if (sp == null) return;
+        double sc = Math.min(W / 1024.0, H / 768.0);
+        int skillW = (int)(170*sc), skillH = (int)(140*sc);
+        sp.setBounds((int)(10*sc), H-skillH-(int)(16*sc), skillW, skillH);
+        if (lh != null) {
+            int lw = (int)(340*sc), lhh = (int)(130*sc);
+            lh.setBounds((W-lw)/2, H-lhh-(int)(16*sc), lw, lhh);
+        }
+        skillsLayer.revalidate(); skillsLayer.repaint();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Turn logic
+    // ══════════════════════════════════════════════════════════
     private void onPlayerSkill(int si) {
         if (processingTurn || !turnManager.isPlayerTurn()) return;
         processingTurn = true;
         setPlayerEnabled(false);
 
-        TurnResult res = turnManager.executeSkill(
-                playerCharacter,
-                arcadeManager.getCurrentEnemy(), // ✅ ALWAYS FRESH
-                si
-        );
-        flushResult(res);
-        refreshUI();
+        TurnResult res = turnManager.executeSkill(playerCharacter, enemyCharacter, si);
+        flushResult(res); refreshUI();
 
         if (res.isTargetDefeated()) { onPlayerWon(); return; }
         if (res.isTurnStolen())     { setPlayerEnabled(true); processingTurn = false; return; }
 
-        turnManager.advanceTurn();
-        refreshCdRow();
-        updateTurnState();
-
+        turnManager.advanceTurn(); refreshCdRow(); updateTurnState();
         new Timer(ENEMY_TURN_DELAY, e -> doEnemyTurn()) {{ setRepeats(false); start(); }};
     }
 
     private void doEnemyTurn() {
         int si = EnemyAI.chooseSkill(enemyCharacter, turnManager.getCooldownManager());
         TurnResult res = turnManager.executeSkill(enemyCharacter, playerCharacter, si);
-        flushResult(res);
-        refreshUI();
+        flushResult(res); refreshUI();
 
         if (res.isTargetDefeated()) { onPlayerLost(); return; }
         if (res.isTurnStolen()) {
@@ -425,156 +282,261 @@ public class ArcadeModeBattleFrame extends JFrame {
             return;
         }
 
-        turnManager.advanceTurn();
-        refreshCdRow();
-        updateTurnState();
-        setPlayerEnabled(true);
-        processingTurn = false;
+        turnManager.advanceTurn(); refreshCdRow(); updateTurnState();
+        setPlayerEnabled(true); processingTurn = false;
     }
 
     private void updateTurnState() {
-        boolean playerTurn = turnManager.isPlayerTurn();
-        setPlayerEnabled(playerTurn);
-        if (turnIndicator == null) return;
-        if (playerTurn) {
-            turnIndicator.setText("▶ Your Turn");
-            turnIndicator.setForeground(GOLD);
-        } else {
-            turnIndicator.setText("⏳ " + enemyCharacter.getName() + " is acting...");
-            turnIndicator.setForeground(ORANGE_LOW);
-        }
+        boolean myTurn = turnManager.isPlayerTurn();
+        setPlayerEnabled(myTurn);
+        if (battleCanvas != null) battleCanvas.setPlayerActive(myTurn);
     }
 
-    // ── Win / Lose ────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════
+    //  Win / Lose
+    // ══════════════════════════════════════════════════════════
     private void onPlayerWon() {
-        setPlayerEnabled(false);
-        arcadeManager.recordVictory();
+        setPlayerEnabled(false); processingTurn = false;
         log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log("🏆  " + playerCharacter.getName() + " defeated " + enemyCharacter.getName() + "!");
+        arcadeManager.recordVictory();
 
-        arcadeManager.recordVictory(); // advances currentIndex
-
-        if (arcadeManager.isFinished()) {
-            new Timer(1400, e -> { ((Timer)e.getSource()).stop(); triggerVictory(); })
-            {{ setRepeats(false); start(); }};
-            return;
-        }
-
-        if (arcadeManager.shouldGiveHPBoost()) {
-            new Timer(1200, e -> { ((Timer)e.getSource()).stop(); giveHPBoost(); })
-            {{ setRepeats(false); start(); }};
-        } else if (arcadeManager.shouldGiveUltimate()) {
-            new Timer(1200, e -> { ((Timer)e.getSource()).stop(); giveUltimate(); })
-            {{ setRepeats(false); start(); }};
-        } else {
-            new Timer(1500, e -> { ((Timer)e.getSource()).stop(); advanceToNextEnemy(); })
-            {{ setRepeats(false); start(); }};
-        }
-    }
-
-    private void onPlayerLost() {
-        setPlayerEnabled(false);
-        log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        log("💀  " + enemyCharacter.getName() + " has defeated you!");
-
-        new Timer(1600, e -> {
+        new Timer(1100, e -> {
             ((Timer)e.getSource()).stop();
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this,
-                        "You have fallen in battle!\n"
-                                + enemyCharacter.getName() + " proved too powerful.\n\n"
-                                + "Returning to main menu...",
-                        "Defeat", JOptionPane.WARNING_MESSAGE);
-                dispose();
-                new MainMenuFrame();
-            });
+            SwingUtilities.invokeLater(this::processVictoryOutcome);
         }) {{ setRepeats(false); start(); }};
     }
 
-    // ── Rewards ───────────────────────────────────────────────
-    private void giveHPBoost() {
-        playerCharacter.increaseMaxHP(ArcadeModeManager.HP_BOOST_AMT);
-        log("✨  Reward: +" + ArcadeModeManager.HP_BOOST_AMT + " Max HP granted!");
-        playerHPBar.setMaximum(playerCharacter.getMaxHP());
-        refreshUI();
-        JOptionPane.showMessageDialog(this,
-                "✨  Power Reward!\n\n+1,000 Max HP granted!\nYou grow stronger with each victory...",
-                "HP Boost Acquired", JOptionPane.INFORMATION_MESSAGE);
-        advanceToNextEnemy();
-    }
-
-    private void giveUltimate() {
-        List<Skill> choices = arcadeManager.getUltimateChoices();
-        if (choices.isEmpty()) { advanceToNextEnemy(); return; }
-
-        String[] options = choices.stream()
-                .map(s -> s.getName() + "  (" + s.getMinDamage() + "–" + s.getMaxDamage() + ")")
-                .toArray(String[]::new);
-
-        int pick = JOptionPane.showOptionDialog(this,
-                "🔥  ULTIMATE SKILL REWARD!\n\nChoose one ultimate ability from your defeated foes:",
-                "Ultimate Acquired",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-                null, options, options[0]);
-
-        if (pick >= 0 && pick < choices.size()) {
-            Skill chosen = choices.get(pick);
-            playerCharacter.addSkill(chosen);
-            rebuildSkillSlots();
-            log("🔥  Ultimate unlocked: " + chosen.getName() + "!");
+    private void processVictoryOutcome() {
+        if (arcadeManager.isFinished()) {
+            dispose(); new ArcadeVictoryFrame(playerCharacter); return;
         }
-        advanceToNextEnemy();
+
+        if (arcadeManager.shouldGiveHPBoost()) {
+            playerCharacter.increaseMaxHP(ArcadeModeManager.HP_BOOST_AMT);
+            log("✨  Reward: +" + ArcadeModeManager.HP_BOOST_AMT + " Max HP!");
+            showInfoOverlay(
+                    "✨  POWER SURGE",
+                    "+" + ArcadeModeManager.HP_BOOST_AMT + " Max HP granted!\nYou grow stronger with each victory.",
+                    this::transitionToTower);
+        } else if (arcadeManager.shouldGiveUltimate()) {
+            showUltimateDraftOverlay(this::transitionToTower);
+        } else {
+            transitionToTower();
+        }
     }
 
-    private void advanceToNextEnemy() {
+    private void transitionToTower() {
+        dispose(); new ArcadeTowerFrame(playerCharacter, arcadeManager);
+    }
 
-        Character next = arcadeManager.getCurrentEnemy();
-        if (next == null) { triggerVictory(); return; }
+    private void onPlayerLost() {
+        setPlayerEnabled(false); processingTurn = false;
+        log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        log("💀  " + enemyCharacter.getName() + " has defeated you!");
 
-        // Show next enemy backstory, then resume this frame
-        Runnable resume = () -> SwingUtilities.invokeLater(() -> {
-            setVisible(true);
-            startFight();
+        new Timer(900, e -> {
+            ((Timer)e.getSource()).stop();
+            showInfoOverlay(
+                    "💀  FALLEN",
+                    "You have fallen in battle.\n" + enemyCharacter.getName() + " proved too powerful.\n\nReturning to main menu...",
+                    () -> { dispose(); new MainMenuFrame(); });
+        }) {{ setRepeats(false); start(); }};
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Overlay helpers
+    // ══════════════════════════════════════════════════════════
+
+    /** Generic info card with a single Continue button. */
+    private void showInfoOverlay(String title, String body, Runnable onConfirm) {
+        overlayLayer.removeAll();
+        overlayLayer.setVisible(true);
+
+        JPanel dim = makeDim();
+        dim.setLayout(new GridBagLayout());
+
+        JPanel card = makeCard(420, 220);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createEmptyBorder(28, 36, 28, 36));
+
+        JLabel titleLbl = cardTitle(title);
+        JLabel bodyLbl  = cardBody(body);
+        JButton btn     = makeGoldOverlayButton("Continue  →");
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.addActionListener(e -> {
+            overlayLayer.setVisible(false); overlayLayer.removeAll();
+            if (onConfirm != null) onConfirm.run();
         });
 
-        setVisible(false);
-        new BackstoryShowcase(
-                CharacterStories.getEnemyStory(next),
-                CharacterStories.getEnemyTitle(next),
-                resume);
+        card.add(titleLbl);
+        card.add(Box.createVerticalStrut(14));
+        card.add(bodyLbl);
+        card.add(Box.createVerticalStrut(22));
+        card.add(btn);
+        dim.add(card);
+        mountOverlay(dim);
     }
 
-    private void triggerVictory() {
-        dispose();
-        new ArcadeVictoryFrame(playerCharacter);
+    /**
+     * Ultimate skill draft overlay.
+     *
+     * Builds a randomized pool of exactly 3 "tier-3" ultimate skills from the
+     * global character roster, strictly excluding the player's own native ultimate.
+     * Player picks one; it is added as their 4th skill.
+     */
+    private void showUltimateDraftOverlay(Runnable onDone) {
+        List<Skill> pool = buildUltimatePool();
+        if (pool.isEmpty()) { onDone.run(); return; }
+
+        overlayLayer.removeAll();
+        overlayLayer.setVisible(true);
+
+        JPanel dim = makeDim();
+        dim.setLayout(new GridBagLayout());
+
+        int cardH = 140 + pool.size() * 54;
+        JPanel card = makeCard(490, cardH);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createEmptyBorder(24, 32, 24, 32));
+
+        JLabel titleLbl = new JLabel("🔥  ULTIMATE SKILL DRAFT", SwingConstants.CENTER);
+        titleLbl.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 22));
+        titleLbl.setForeground(new Color(0xFF, 0xAA, 0x30));
+        titleLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel subLbl = new JLabel("Choose one ultimate ability — choose wisely:", SwingConstants.CENTER);
+        subLbl.setFont(new Font("Serif", Font.ITALIC, 13));
+        subLbl.setForeground(LOG_FG);
+        subLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        card.add(titleLbl);
+        card.add(Box.createVerticalStrut(8));
+        card.add(subLbl);
+        card.add(Box.createVerticalStrut(16));
+
+        for (Skill skill : pool) {
+            JButton btn = makeSkillPickButton(
+                    skill.getName(),
+                    skill.getMinDamage() + "–" + skill.getMaxDamage() + " dmg  |  CD: " + skill.getCooldown());
+            btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+            btn.addActionListener(e -> {
+                playerCharacter.addSkill(skill);
+                rebuildSkillSlots();
+                log("🔥  Ultimate unlocked: " + skill.getName() + "!");
+                overlayLayer.setVisible(false); overlayLayer.removeAll();
+                onDone.run();
+            });
+            card.add(btn);
+            card.add(Box.createVerticalStrut(6));
+        }
+
+        dim.add(card);
+        mountOverlay(dim);
+    }
+
+    /**
+     * Builds the randomized ultimate draft pool.
+     *
+     * Rules:
+     *  1. Take the 3rd skill (index 2) of every character in the global roster.
+     *  2. Remove any skill whose name matches the player's own 3rd skill.
+     *  3. Shuffle and return the first 3 (or fewer if roster is small).
+     */
+    private List<Skill> buildUltimatePool() {
+        // Global roster — same order as CharacterSelectionFrame
+        Character[] globalRoster = {
+                new Tyrone(), new MakelanShere(), new Mary(), new Dirk(),
+                new Flamara(), new Dea(), new Adamus(), new Tera()
+        };
+
+        // Determine the player's own ultimate name (skill index 2)
+        String playerUltimateName = "";
+        List<Skill> mySkills = playerCharacter.getSkills();
+        if (mySkills.size() >= 3) playerUltimateName = mySkills.get(2).getName();
+
+        List<Skill> pool = new ArrayList<>();
+        for (Character c : globalRoster) {
+            // Skip player's own character class
+            if (c.getName().equals(playerCharacter.getName())) continue;
+            List<Skill> skills = c.getSkills();
+            if (skills.size() >= 3) {
+                Skill ultimate = skills.get(2);
+                // Skip if it's the same skill as the player already owns
+                if (!ultimate.getName().equals(playerUltimateName)) {
+                    pool.add(ultimate);
+                }
+            }
+        }
+
+        Collections.shuffle(pool);
+        return pool.subList(0, Math.min(3, pool.size()));
+    }
+
+    // ── Overlay widget builders ───────────────────────────────
+    private JPanel makeDim() {
+        JPanel dim = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(new Color(0, 0, 0, 180));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
+        };
+        dim.setOpaque(false);
+        return dim;
+    }
+
+    private JPanel makeCard(int w, int h) {
+        JPanel card = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(0x0E, 0x09, 0x04, 248));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+                g2.setStroke(new BasicStroke(2f));
+                g2.setColor(GOLD);
+                g2.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 20, 20);
+                g2.dispose(); super.paintComponent(g);
+            }
+        };
+        card.setOpaque(false);
+        card.setPreferredSize(new Dimension(w, h));
+        card.setMaximumSize(new Dimension(w, h));
+        return card;
+    }
+
+    private JLabel cardTitle(String text) {
+        JLabel l = new JLabel(text, SwingConstants.CENTER);
+        l.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 22));
+        l.setForeground(GOLD); l.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return l;
+    }
+
+    private JLabel cardBody(String text) {
+        String html = "<html><div style='text-align:center;color:#D4C5A0;font-size:13px;font-family:serif'>"
+                + text.replace("\n", "<br>") + "</div></html>";
+        JLabel l = new JLabel(html, SwingConstants.CENTER);
+        l.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return l;
+    }
+
+    private void mountOverlay(JPanel dim) {
+        overlayLayer.add(dim);
+        dim.setBounds(0, 0, getWidth(), getHeight());
+        overlayLayer.addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                dim.setBounds(0, 0, overlayLayer.getWidth(), overlayLayer.getHeight());
+            }
+        });
+        overlayLayer.revalidate(); overlayLayer.repaint();
     }
 
     // ══════════════════════════════════════════════════════════
-    //  UI helpers  (mirrors PVEBattleFrame exactly)
+    //  UI helpers
     // ══════════════════════════════════════════════════════════
-
-    private void refreshUI() {
-        if (playerHPBar == null) return;
-
-        playerHPBar.setMaximum(playerCharacter.getMaxHP());
-        playerHPBar.setValue(playerCharacter.getCurrentHP());
-        enemyHPBar.setMaximum(enemyCharacter.getMaxHP());
-        enemyHPBar.setValue(enemyCharacter.getCurrentHP());
-
-        playerHPLabel.setText("HP: " + playerCharacter.getCurrentHP() + " / " + playerCharacter.getMaxHP());
-        enemyHPLabel.setText("HP: " + enemyCharacter.getCurrentHP() + " / " + enemyCharacter.getMaxHP());
-
-        tintBar(playerHPBar, playerCharacter, PLAYER_CLR);
-        tintBar(enemyHPBar,  enemyCharacter,  arcadeManager.isFinalBoss() ? BOSS_CLR : ENEMY_CLR);
-        repaint();
-    }
-
-    private void tintBar(JProgressBar bar, Character c, Color base) {
-        double pct = (double) c.getCurrentHP() / c.getMaxHP();
-        if      (pct <= 0.25) bar.setForeground(RED_CRIT);
-        else if (pct <= 0.50) bar.setForeground(ORANGE_LOW);
-        else                  bar.setForeground(base);
-    }
+    private void refreshUI() { if (battleCanvas != null) battleCanvas.repaint(); }
 
     private void refreshCdRow() {
         if (turnManager == null) return;
@@ -583,19 +545,18 @@ public class ArcadeModeBattleFrame extends JFrame {
             if (skillBtns[i] == null || i >= skills.size()) continue;
             int cd = turnManager.getCooldownManager().getRemainingCooldown(playerCharacter, i);
             if (cd > 0) {
-                cdLabels[i].setText(cd + " turn(s)");
-                cdLabels[i].setForeground(ORANGE_LOW);
+                cdLabels[i].setText(cd + " turn(s)"); cdLabels[i].setForeground(ORANGE_LOW);
                 skillBtns[i].setEnabled(false);
             } else {
-                cdLabels[i].setText("READY");
-                cdLabels[i].setForeground(GREEN_RDY);
-                skillBtns[i].setEnabled(true);
+                cdLabels[i].setText("READY"); cdLabels[i].setForeground(GREEN_RDY);
             }
         }
     }
 
     private void setPlayerEnabled(boolean on) {
-        for (JButton b : skillBtns) if (b != null) b.setEnabled(on);
+        List<Skill> skills = playerCharacter.getSkills();
+        for (int i = 0; i < skillBtns.length; i++)
+            if (skillBtns[i] != null) skillBtns[i].setEnabled(on && i < skills.size());
         if (on) refreshCdRow();
     }
 
@@ -610,77 +571,188 @@ public class ArcadeModeBattleFrame extends JFrame {
         });
     }
 
+    private String getFrameImg(String name) {
+        for (int i = 0; i < CHAR_NAMES.length; i++)
+            if (CHAR_NAMES[i].equals(name)) return FRAME_IMGS[i];
+        return null;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  BattleCanvas — Graphics2D HUD
+    // ══════════════════════════════════════════════════════════
+    private class BattleCanvas extends JPanel {
+        private final Image playerFrame, enemyFrame;
+        private final boolean isBoss;
+        private final int idx, total;
+        private boolean playerActive = true;
+        private float   glowTick    = 0f;
+        private final Timer glowTimer;
+
+        BattleCanvas(boolean isBoss, int idx, int total) {
+            setOpaque(false);
+            this.isBoss = isBoss; this.idx = idx; this.total = total;
+            playerFrame = loadImage(getFrameImg(playerCharacter.getName()));
+            enemyFrame  = loadImage(getFrameImg(enemyCharacter.getName()));
+            glowTimer = new Timer(20, e -> { glowTick += 0.08f; repaint(); });
+            glowTimer.start();
+        }
+
+        void setPlayerActive(boolean v) { playerActive = v; }
+
+        @Override protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            int W = getWidth(), H = getHeight();
+            double sc = Math.min(W/1024.0, H/768.0);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,   RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,  RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+            // Counter pill at top-center
+            String ctTxt = isBoss ? "⚡  FINAL BOSS  ⚡" : "Enemy  " + idx + "  of  " + total;
+            Color  ctClr = isBoss ? BOSS_CLR : GOLD;
+            g2.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, Math.max(14, (int)(18*sc))));
+            FontMetrics fm = g2.getFontMetrics();
+            int ctw = fm.stringWidth(ctTxt)+24, cth = fm.getHeight()+10;
+            int ctx = (W-ctw)/2, cty = (int)(10*sc);
+            g2.setColor(new Color(0x08,0x04,0x02,200)); g2.fillRoundRect(ctx,cty,ctw,cth,cth,cth);
+            g2.setColor(new Color(ctClr.getRed(),ctClr.getGreen(),ctClr.getBlue(),120));
+            g2.setStroke(new BasicStroke(1.5f)); g2.drawRoundRect(ctx,cty,ctw,cth,cth,cth);
+            drawShadow(g2,ctTxt,ctx+12,cty+fm.getAscent()+4,ctClr);
+
+            // Measurements
+            int portW=(int)(82*sc),portH=(int)(82*sc),hpW=(int)(230*sc),hpH=(int)(16*sc);
+            int pillW=(int)(140*sc),pillH=(int)(24*sc),portY=cty+cth+(int)(8*sc);
+
+            // Player
+            int ppx=(int)(10*sc);
+            drawPortrait(g2,playerFrame,ppx,portY,portW,portH,PLAYER_CLR,playerActive);
+            int phx=ppx+portW+(int)(8*sc),phy=portY+(int)(8*sc);
+            drawHPBar(g2,phx,phy,hpW,hpH,playerCharacter,PLAYER_CLR);
+            g2.setFont(new Font("SansSerif",Font.PLAIN,Math.max(8,(int)(10*sc))));
+            drawShadow(g2,"HP: "+playerCharacter.getCurrentHP()+" / "+playerCharacter.getMaxHP(),phx,phy+hpH+(int)(10*sc),new Color(0xFF,0xF5,0xDC,190));
+            drawNamePill(g2,playerCharacter.getName(),phx,phy+hpH+(int)(14*sc),pillW,pillH,new Color(0x20,0x50,0x20,215),new Color(0x80,0xFF,0xAA));
+            g2.setFont(new Font("SansSerif",Font.BOLD,Math.max(9,(int)(11*sc))));
+            drawShadow(g2,"PLAYER",phx,phy-(int)(3*sc),new Color(0xEE,0xEE,0xEE));
+
+            // Enemy
+            Color ec = isBoss ? BOSS_CLR : ENEMY_CLR;
+            int epx=W-(int)(10*sc)-portW;
+            drawPortrait(g2,enemyFrame,epx,portY,portW,portH,ec,!playerActive);
+            int ehx=epx-hpW-(int)(8*sc),ehy=portY+(int)(8*sc);
+            drawHPBar(g2,ehx,ehy,hpW,hpH,enemyCharacter,ec);
+            g2.setFont(new Font("SansSerif",Font.PLAIN,Math.max(8,(int)(10*sc))));
+            drawShadow(g2,"HP: "+enemyCharacter.getCurrentHP()+" / "+enemyCharacter.getMaxHP(),ehx,ehy+hpH+(int)(10*sc),new Color(0xFF,0xF5,0xDC,190));
+            Color pillBg=isBoss?new Color(0x30,0x00,0x40,215):new Color(0x50,0x10,0x10,215);
+            Color pillFg=isBoss?new Color(0xDD,0x88,0xFF):new Color(0xFF,0x77,0x77);
+            drawNamePill(g2,enemyCharacter.getName(),ehx,ehy+hpH+(int)(14*sc),pillW,pillH,pillBg,pillFg);
+            g2.setFont(new Font("SansSerif",Font.BOLD,Math.max(9,(int)(11*sc))));
+            drawShadow(g2,isBoss?"⚡ BOSS":"ENEMY",ehx,ehy-(int)(3*sc),new Color(0xEE,0xEE,0xEE));
+
+            // Turn indicator
+            String tt=playerActive?"▶ Your Turn":"⏳ "+enemyCharacter.getName()+" is acting...";
+            g2.setFont(new Font("Serif",Font.BOLD|Font.ITALIC,Math.max(10,(int)(13*sc))));
+            fm=g2.getFontMetrics();
+            drawShadow(g2,tt,(W-fm.stringWidth(tt))/2,cty+cth+(int)(2*sc),GOLD);
+            g2.dispose();
+        }
+
+        private void drawPortrait(Graphics2D g2,Image img,int x,int y,int w,int h,Color accent,boolean active){
+            if(active){float a=0.22f+0.16f*(float)Math.sin(glowTick);for(int r=5;r>=1;r--){int sp=r*3;g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),Math.min(255,(int)(a*80/r))));g2.setStroke(new BasicStroke(sp));g2.drawRoundRect(x-sp/2,y-sp/2,w+sp,h+sp,10,10);}}
+            g2.setColor(new Color(0x08,0x05,0x02,210));g2.fillRoundRect(x,y,w,h,8,8);
+            if(img!=null)g2.drawImage(img,x,y,w,h,null);
+            g2.setStroke(new BasicStroke(2));g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),active?220:90));g2.drawRoundRect(x,y,w,h,8,8);
+        }
+        private void drawHPBar(Graphics2D g2,int x,int y,int w,int h,Character c,Color base){
+            double pct=Math.max(0,Math.min(1.0,(double)c.getCurrentHP()/c.getMaxHP()));
+            Color bar=pct<=0.25?RED_CRIT:pct<=0.50?ORANGE_LOW:base;
+            g2.setColor(new Color(0x08,0x04,0x02,220));g2.fillRoundRect(x,y,w,h,h,h);
+            int fw=(int)(w*pct);if(fw>2){g2.setPaint(new GradientPaint(x,y,bar.brighter(),x,y+h,bar.darker()));g2.fillRoundRect(x,y,fw,h,h,h);}
+            g2.setStroke(new BasicStroke(1));g2.setColor(new Color(0xFF,0xFF,0xFF,50));g2.drawRoundRect(x,y,w,h,h,h);
+        }
+        private void drawNamePill(Graphics2D g2,String t,int x,int y,int w,int h,Color bg,Color fg){
+            g2.setColor(bg);g2.fillRoundRect(x,y,w,h,h,h);g2.setStroke(new BasicStroke(1));
+            g2.setColor(new Color(fg.getRed(),fg.getGreen(),fg.getBlue(),130));g2.drawRoundRect(x,y,w,h,h,h);
+            g2.setFont(new Font("Serif",Font.BOLD,Math.max(9,h-6)));FontMetrics fm=g2.getFontMetrics();
+            int tx=x+(w-fm.stringWidth(t))/2,ty=y+(h+fm.getAscent()-fm.getDescent())/2;
+            g2.setColor(new Color(0,0,0,100));g2.drawString(t,tx+1,ty+1);g2.setColor(fg);g2.drawString(t,tx,ty);
+        }
+        private void drawShadow(Graphics2D g2,String t,int x,int y,Color c){
+            g2.setColor(new Color(0,0,0,150));g2.drawString(t,x+1,y+1);g2.setColor(c);g2.drawString(t,x,y);
+        }
+    }
+
     // ── Widget factories ──────────────────────────────────────
-    private JPanel makePortrait(Character ch) {
-        JPanel p = new JPanel(new BorderLayout());
-        p.setBackground(new Color(0x18, 0x14, 0x0E));
-        p.setBorder(new LineBorder(new Color(0x40, 0x32, 0x18), 1));
-        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
-        p.setPreferredSize(new Dimension(0, 100));
-        JLabel lbl = new JLabel(ch.getName(), SwingConstants.CENTER);
-        lbl.setFont(new Font("Serif", Font.ITALIC, 11));
-        lbl.setForeground(new Color(0x70, 0x60, 0x40));
-        p.add(lbl, BorderLayout.CENTER);
-        return p;
-    }
-
-    private JProgressBar makeHPBar(Character ch, Color color) {
-        JProgressBar bar = new JProgressBar(0, ch.getMaxHP());
-        bar.setValue(ch.getCurrentHP());
-        bar.setStringPainted(false);
-        bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 13));
-        bar.setForeground(color);
-        bar.setBackground(new Color(0x2A, 0x1A, 0x10));
-        bar.setBorder(BorderFactory.createLineBorder(new Color(0x50, 0x40, 0x20)));
-        return bar;
-    }
-
-    private JLabel makeAlignedLabel(String text, Font font, Color color) {
-        JLabel lbl = new JLabel(text, SwingConstants.CENTER);
-        lbl.setFont(font);
-        lbl.setForeground(color);
-        lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        return lbl;
-    }
-
-    private JLabel makeCdLabel(String text, Color color) {
-        JLabel lbl = new JLabel(text, SwingConstants.CENTER);
-        lbl.setFont(new Font("SansSerif", Font.BOLD, 9));
-        lbl.setForeground(color);
-        return lbl;
-    }
-
-    private JButton makeSkillButton(String label, Color accent) {
+    private JButton makePillButton(String label, Color bg, Color fg) {
         JButton btn = new JButton(label) {
             @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                boolean h  = getModel().isRollover();
-                boolean en = isEnabled();
-                g2.setPaint(new GradientPaint(0, 0,
-                        h ? new Color(0x3C,0x2C,0x10) : new Color(0x28,0x1E,0x0C),
-                        0, getHeight(),
-                        h ? new Color(0x28,0x1A,0x08) : new Color(0x18,0x10,0x06)));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
-                g2.setStroke(new BasicStroke(1.5f));
-                g2.setColor(en
-                        ? new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), h ? 255 : 180)
-                        : new Color(0x50, 0x40, 0x20, 100));
-                g2.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 10, 10);
-                g2.setFont(new Font("Serif", Font.BOLD, 11));
-                FontMetrics fm = g2.getFontMetrics();
-                int tx = (getWidth()  - fm.stringWidth(getText())) / 2;
-                int ty = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
-                g2.setColor(new Color(0, 0, 0, 80));
-                g2.drawString(getText(), tx+1, ty+1);
-                g2.setColor(en ? (h ? new Color(0xFF,0xE0,0x80) : CREAM) : new Color(0x60,0x50,0x30));
-                g2.drawString(getText(), tx, ty);
-                g2.dispose();
+                Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean h=getModel().isRollover(),en=isEnabled();
+                Color bc=en?(h?bg.brighter():bg):new Color(0x28,0x20,0x18,140);
+                g2.setColor(new Color(bc.getRed(),bc.getGreen(),bc.getBlue(),210));g2.fillRoundRect(0,0,getWidth(),getHeight(),getHeight(),getHeight());
+                g2.setStroke(new BasicStroke(1.5f));g2.setColor(new Color(fg.getRed(),fg.getGreen(),fg.getBlue(),en?(h?255:180):60));
+                g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2,getHeight()-2,getHeight()-2);
+                g2.setFont(new Font("Serif",Font.BOLD,Math.max(9,getHeight()-8)));FontMetrics fm=g2.getFontMetrics();
+                int tx=(getWidth()-fm.stringWidth(getText()))/2,ty=(getHeight()+fm.getAscent()-fm.getDescent())/2;
+                g2.setColor(new Color(0,0,0,90));g2.drawString(getText(),tx+1,ty+1);
+                g2.setColor(en?fg:new Color(0x60,0x50,0x40));g2.drawString(getText(),tx,ty);g2.dispose();
             }
         };
-        btn.setContentAreaFilled(false); btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
+        btn.setContentAreaFilled(false);btn.setBorderPainted(false);btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
+    }
+
+    private JButton makeGoldOverlayButton(String text) {
+        JButton btn = new JButton(text) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean h=getModel().isRollover();
+                g2.setPaint(new GradientPaint(0,0,h?new Color(170,110,40):new Color(120,70,20),0,getHeight(),h?new Color(120,80,30):new Color(80,40,10)));
+                g2.fillRoundRect(0,0,getWidth(),getHeight(),14,14);
+                if(h){g2.setColor(new Color(255,215,120,80));g2.setStroke(new BasicStroke(2.5f));g2.drawRoundRect(2,2,getWidth()-4,getHeight()-4,14,14);}
+                g2.setColor(new Color(220,180,90));g2.setStroke(new BasicStroke(1.5f));g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2,14,14);
+                g2.setFont(new Font("Serif",Font.BOLD,14));FontMetrics fm=g2.getFontMetrics();
+                int tx=(getWidth()-fm.stringWidth(getText()))/2,ty=(getHeight()+fm.getAscent())/2-2;
+                g2.setColor(Color.BLACK);g2.drawString(getText(),tx+1,ty+1);
+                g2.setColor(new Color(255,230,170));g2.drawString(getText(),tx,ty);g2.dispose();
+            }
+        };
+        btn.setOpaque(false);btn.setContentAreaFilled(false);btn.setBorderPainted(false);btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));btn.setPreferredSize(new Dimension(200,46));
+        return btn;
+    }
+
+    private JButton makeSkillPickButton(String name, String stat) {
+        JButton btn = new JButton(name + "   [" + stat + "]") {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean h=getModel().isRollover();
+                g2.setColor(h?new Color(0x3C,0x18,0x04,240):new Color(0x22,0x0E,0x02,220));g2.fillRoundRect(0,0,getWidth(),getHeight(),10,10);
+                g2.setStroke(new BasicStroke(1.5f));g2.setColor(h?new Color(0xFF,0xAA,0x30):new Color(0xC8,0x70,0x10,160));
+                g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2,10,10);
+                g2.setFont(new Font("Serif",Font.BOLD,13));FontMetrics fm=g2.getFontMetrics();
+                int tx=(getWidth()-fm.stringWidth(getText()))/2,ty=(getHeight()+fm.getAscent()-fm.getDescent())/2;
+                g2.setColor(new Color(0,0,0,80));g2.drawString(getText(),tx+1,ty+1);
+                g2.setColor(h?new Color(0xFF,0xE0,0x80):CREAM);g2.drawString(getText(),tx,ty);g2.dispose();
+            }
+        };
+        btn.setOpaque(false);btn.setContentAreaFilled(false);btn.setBorderPainted(false);btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(400,42));btn.setMaximumSize(new Dimension(400,42));
+        return btn;
+    }
+
+    private Image loadImage(String path) {
+        if (path == null) return null;
+        URL url = getClass().getResource(path);
+        if (url == null) { System.err.println("Missing: " + path); return null; }
+        return new ImageIcon(url).getImage();
+    }
+
+    private class BgPanel extends JPanel {
+        private final Image img;
+        BgPanel(String p){img=loadImage(p);setOpaque(true);setBackground(Color.BLACK);}
+        @Override protected void paintComponent(Graphics g){super.paintComponent(g);if(img!=null){Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);g2.drawImage(img,0,0,getWidth(),getHeight(),null);g2.dispose();}}
     }
 }

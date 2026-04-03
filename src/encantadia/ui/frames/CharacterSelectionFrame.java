@@ -3,6 +3,7 @@ package encantadia.ui.frames;
 import encantadia.BackstoryShowcase;
 import encantadia.ScreenManager;
 import encantadia.battle.EnemyFactory;
+import encantadia.battle.arcade.ArcadeModeManager;
 import encantadia.characters.*;
 import encantadia.characters.Character;
 import encantadia.gamemode.GameModeType;
@@ -207,7 +208,7 @@ public class CharacterSelectionFrame extends JFrame {
     }
 
     private void startArcadeFlow(Character character) {
-        Runnable launchTower = () -> new ArcadeTowerFrame(character);
+        Runnable launchTower = () -> new ArcadeTowerFrame(character, new ArcadeModeManager(character));
         new BackstoryShowcase(
                 CharacterStories.getCharacterStory(character),
                 CharacterStories.getCharacterTitle(character), launchTower);
