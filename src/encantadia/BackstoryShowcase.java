@@ -17,9 +17,11 @@ public class BackstoryShowcase extends JFrame {
     private static final String BG_PATH        = "/resources/background (3).png";
     private static final String PARCHMENT_PATH = "/resources/base1SBS.png";
 
-    private static final int    PARAGRAPHS_PER_PAGE = 10;
-    private static final int    CHAR_DELAY_MS       = 14;
-    private static final double PARCHMENT_RATIO     = 0.42;
+    private static final int PARAGRAPHS_PER_PAGE = 10;
+    private static final int CHAR_DELAY_MS       = 14;
+
+    private static final double PARCHMENT_WIDTH_RATIO  = 0.60;
+    private static final double PARCHMENT_HEIGHT_RATIO = 0.75;
 
     private static final Color INK_DARK = new Color(0x3A, 0x18, 0x04);
     private static final Color INK_MID  = new Color(0x5C, 0x2E, 0x08);
@@ -27,27 +29,30 @@ public class BackstoryShowcase extends JFrame {
     private static final Color ORNAMENT = new Color(0xA0, 0x72, 0x28);
 
     private JTextPane storyPane;
-    private JButton   continueButton;
-    private JButton   skipButton;
-    private JLabel    pageLabel;
-    private JPanel    parchmentPanel;
-    private JPanel    innerPanel;
+    private JButton continueButton;
+    private JButton skipButton;
+    private JLabel pageLabel;
 
-    // ── Story data ────────────────────────────────────────────
-    private final String[]  paragraphs;
-    private final String    storyTitle;  // used in HTML builder
-    private final Runnable  onFinish;    // called when last page is done
-    private final int       totalPages;
-    private int             currentPage = 0;
+    private JPanel parchmentPanel;
+    private JPanel innerPanel;
 
-    private int fontSize  = 8;
+    private JLayeredPane layeredPane;
+    private JPanel centerWrapper;
+
+    private final String[] paragraphs;
+    private final String storyTitle;
+    private final Runnable onFinish;
+
+    private final int totalPages;
+    private int currentPage = 0;
+
+    private int fontSize = 8;
     private int titleSize = 19;
 
     private volatile Thread animThread = null;
 
-    // ══════════════════════════════════════════════════════════
-    //  Constructor A — StoryType based (mode lores + game lore)
-    // ══════════════════════════════════════════════════════════
+    // ================= CONSTRUCTORS =================
+
     public BackstoryShowcase(StoryType storyType) {
         this(storyType, null);
     }
@@ -68,49 +73,74 @@ public class BackstoryShowcase extends JFrame {
         );
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Constructor B — Custom paragraphs + title + callback
-    //  Used for character backstories and enemy reveals.
-    // ══════════════════════════════════════════════════════════
     public BackstoryShowcase(String[] paragraphs, String title, Runnable onFinish) {
         this.paragraphs = paragraphs;
         this.storyTitle = title;
-        this.onFinish   = onFinish;
+        this.onFinish = onFinish;
         this.totalPages = (int) Math.ceil((double) paragraphs.length / PARAGRAPHS_PER_PAGE);
 
-        setTitle("Encantadia \u2013 " + title);
+        setTitle("Encantadia – " + title);
         setSize(1024, 768);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setResizable(true);
-        setLayout(new BorderLayout());
 
-        add(new BgPanel(BG_PATH), BorderLayout.CENTER);
+        // ================= LAYERED UI =================
+        layeredPane = new JLayeredPane();
+        layeredPane.setLayout(null);
+        setContentPane(layeredPane);
+
+        // Background
+        BgPanel bg = new BgPanel(BG_PATH);
+        bg.setBounds(0, 0, getWidth(), getHeight());
+        layeredPane.add(bg, Integer.valueOf(0));
+
+        // Build parchment UI
         buildParchmentPanel();
-        add(parchmentPanel, BorderLayout.SOUTH);
 
+        // Center wrapper
+        centerWrapper = new JPanel(new GridBagLayout());
+        centerWrapper.setOpaque(false);
+        centerWrapper.setBounds(0, 0, getWidth(), getHeight());
+        centerWrapper.add(parchmentPanel);
+
+        layeredPane.add(centerWrapper, Integer.valueOf(1));
+
+        // Resize handling
         addComponentListener(new ComponentAdapter() {
-            @Override public void componentResized(ComponentEvent e) { updateLayout(); }
+            @Override
+            public void componentResized(ComponentEvent e) {
+                int w = getWidth();
+                int h = getHeight();
+
+                bg.setBounds(0, 0, w, h);
+                centerWrapper.setBounds(0, 0, w, h);
+
+                updateLayout();
+            }
         });
+
         ScreenManager.register(this);
         setVisible(true);
+
         SwingUtilities.invokeLater(() -> {
             updateLayout();
             animatePage(0);
         });
     }
+
     @Override
     public void dispose() {
         ScreenManager.unregister(this);
         super.dispose();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  UI construction
-    // ══════════════════════════════════════════════════════════
+    // ================= UI BUILD =================
+
     private void buildParchmentPanel() {
         parchmentPanel = new BgPanel(PARCHMENT_PATH);
         parchmentPanel.setLayout(new BorderLayout());
+        parchmentPanel.setOpaque(false);
 
         storyPane = new JTextPane();
         storyPane.setContentType("text/html");
@@ -122,6 +152,7 @@ public class BackstoryShowcase extends JFrame {
         JScrollPane scroll = new JScrollPane(storyPane,
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
         scroll.setOpaque(false);
         scroll.getViewport().setOpaque(false);
         scroll.setBorder(null);
@@ -131,11 +162,11 @@ public class BackstoryShowcase extends JFrame {
         pageLabel.setFont(new Font("Serif", Font.ITALIC, 8));
         pageLabel.setForeground(ORNAMENT);
 
-        continueButton = makeStyledButton("Continue  \u00bb");
+        continueButton = makeStyledButton("Continue »");
         continueButton.setEnabled(false);
         continueButton.addActionListener(e -> handleContinue());
 
-        skipButton = makeStyledButton("Skip  \u00bb\u00bb");
+        skipButton = makeStyledButton("Skip »»");
         skipButton.addActionListener(e -> handleSkip());
 
         JPanel rightButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
@@ -146,20 +177,19 @@ public class BackstoryShowcase extends JFrame {
         JPanel btnRow = new JPanel(new BorderLayout());
         btnRow.setOpaque(false);
         btnRow.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
-        btnRow.add(pageLabel,    BorderLayout.WEST);
+        btnRow.add(pageLabel, BorderLayout.WEST);
         btnRow.add(rightButtons, BorderLayout.EAST);
 
         innerPanel = new JPanel(new BorderLayout(0, 4));
         innerPanel.setOpaque(false);
-        innerPanel.add(scroll,  BorderLayout.CENTER);
-        innerPanel.add(btnRow,  BorderLayout.SOUTH);
+        innerPanel.add(scroll, BorderLayout.CENTER);
+        innerPanel.add(btnRow, BorderLayout.SOUTH);
 
         parchmentPanel.add(innerPanel, BorderLayout.CENTER);
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Responsive layout
-    // ══════════════════════════════════════════════════════════
+    // ================= LAYOUT =================
+
     private void updateLayout() {
         int w = getWidth();
         int h = getHeight();
@@ -168,12 +198,17 @@ public class BackstoryShowcase extends JFrame {
         double scale = Math.min(w / 1024.0, h / 768.0);
         scale = Math.min(scale, 1.4);
 
-        int parchmentH = (int)(h * PARCHMENT_RATIO);
-        parchmentPanel.setPreferredSize(new Dimension(w, parchmentH));
+        int parchmentW = (int)(w * PARCHMENT_WIDTH_RATIO);
+        int parchmentH = (int)(h * PARCHMENT_HEIGHT_RATIO);
+
+        parchmentPanel.setPreferredSize(new Dimension(parchmentW, parchmentH));
+        parchmentPanel.setMaximumSize(new Dimension(parchmentW, parchmentH));
+        parchmentPanel.setMinimumSize(new Dimension(parchmentW, parchmentH));
 
         int hPad = (int)(w * 0.08);
         int vTop = (int)(parchmentH * 0.06);
         int vBot = (int)(parchmentH * 0.035);
+
         innerPanel.setBorder(BorderFactory.createEmptyBorder(vTop, hPad, vBot, hPad));
 
         int btnW = (int)(140 * scale);
@@ -182,7 +217,7 @@ public class BackstoryShowcase extends JFrame {
         continueButton.setPreferredSize(new Dimension(btnW, btnH));
         skipButton.setPreferredSize(new Dimension(btnW, btnH));
 
-        fontSize  = (int)(11 * scale);
+        fontSize = (int)(11 * scale);
         titleSize = (int)(fontSize * 1.35);
 
         if (animThread == null || !animThread.isAlive()) {
@@ -193,31 +228,54 @@ public class BackstoryShowcase extends JFrame {
         repaint();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Animation
-    // ══════════════════════════════════════════════════════════
+    // ================= BACKGROUND =================
+
+    private class BgPanel extends JPanel {
+        private final Image img;
+
+        BgPanel(String path) {
+            URL url = getClass().getResource(path);
+            img = (url != null) ? new ImageIcon(url).getImage() : null;
+            setOpaque(false);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (img == null) return;
+
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+            g2.drawImage(img, 0, 0, getWidth(), getHeight(), null);
+            g2.dispose();
+        }
+    }
+
+    // ================= ANIMATION =================
+
     private void animatePage(int page) {
         currentPage = page;
         stopAnimThread();
 
         continueButton.setEnabled(false);
-        continueButton.setText(isLastPage() ? "Begin  »" : "Continue  »");
+        continueButton.setText(isLastPage() ? "Begin »" : "Continue »");
         pageLabel.setText("  Page " + (page + 1) + " of " + totalPages);
 
         final int fs = fontSize;
         final int ts = titleSize;
 
         int from = page * PARAGRAPHS_PER_PAGE;
-        int to   = Math.min(from + PARAGRAPHS_PER_PAGE, paragraphs.length);
+        int to = Math.min(from + PARAGRAPHS_PER_PAGE, paragraphs.length);
 
         StringBuilder body = new StringBuilder();
         for (int i = from; i < to; i++) body.append(paragraphs[i]);
 
         final String fullHtml = buildPageHtml(body.toString(), page == 0, fs, ts);
 
-        // Split HTML safely
         final int bodyStart = fullHtml.indexOf("<body>") + 6;
-        final int bodyEnd   = fullHtml.lastIndexOf("</body>");
+        final int bodyEnd = fullHtml.lastIndexOf("</body>");
 
         final String prefix = fullHtml.substring(0, bodyStart);
         final String content = fullHtml.substring(bodyStart, bodyEnd);
@@ -234,7 +292,6 @@ public class BackstoryShowcase extends JFrame {
                     char c = content.charAt(i);
                     visible.append(c);
 
-                    // Handle HTML tags (skip delay)
                     if (c == '<') { inTag = true; continue; }
                     if (c == '>') { inTag = false; continue; }
                     if (inTag) continue;
@@ -243,18 +300,15 @@ public class BackstoryShowcase extends JFrame {
 
                     SwingUtilities.invokeLater(() -> {
                         storyPane.setText(snap);
-                        storyPane.setCaretPosition(
-                                storyPane.getDocument().getLength()
-                        );
+                        storyPane.setCaretPosition(storyPane.getDocument().getLength());
                     });
 
-                    // 🎭 DRAMATIC TIMING
                     if (c == '.' || c == '!' || c == '?') {
-                        Thread.sleep(220); // long pause
+                        Thread.sleep(220);
                     } else if (c == ',') {
-                        Thread.sleep(120); // medium pause
+                        Thread.sleep(120);
                     } else {
-                        Thread.sleep(CHAR_DELAY_MS); // normal typing
+                        Thread.sleep(CHAR_DELAY_MS);
                     }
                 }
 
@@ -271,11 +325,6 @@ public class BackstoryShowcase extends JFrame {
         animThread.start();
     }
 
-    private static int indexOfFirstParagraph(String html, int searchFrom) {
-        int idx = html.indexOf("<p", searchFrom);
-        return (idx >= 0) ? idx : searchFrom;
-    }
-
     private void stopAnimThread() {
         if (animThread != null && animThread.isAlive()) {
             animThread.interrupt();
@@ -286,16 +335,15 @@ public class BackstoryShowcase extends JFrame {
 
     private void renderFull(int page, int fs, int ts) {
         int from = page * PARAGRAPHS_PER_PAGE;
-        int to   = Math.min(from + PARAGRAPHS_PER_PAGE, paragraphs.length);
+        int to = Math.min(from + PARAGRAPHS_PER_PAGE, paragraphs.length);
+
         StringBuilder body = new StringBuilder();
         for (int i = from; i < to; i++) body.append(paragraphs[i]);
+
         storyPane.setText(buildPageHtml(body.toString(), page == 0, fs, ts));
         storyPane.setCaretPosition(0);
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Navigation
-    // ══════════════════════════════════════════════════════════
     private void handleSkip() {
         if (animThread != null && animThread.isAlive()) {
             stopAnimThread();
@@ -309,182 +357,148 @@ public class BackstoryShowcase extends JFrame {
         else animatePage(currentPage + 1);
     }
 
-    private boolean isLastPage() { return currentPage >= totalPages - 1; }
+    private boolean isLastPage() {
+        return currentPage >= totalPages - 1;
+    }
 
     private void proceed() {
         dispose();
         if (onFinish != null) onFinish.run();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  HTML builder — uses storyTitle field (not storyType)
-    // ══════════════════════════════════════════════════════════
-    private String buildPageHtml(String body, boolean showTitle, int fs, int ts) {
-        String inkDark  = toHex(INK_DARK);
-        String inkMid   = toHex(INK_MID);
-        String inkGold  = toHex(INK_GOLD);
-        String ornament = toHex(ORNAMENT);
-        int divSize   = Math.max(10, fs - 1);
-        int smallSize = Math.max(10, fs - 2);
-        int dropSize  = (int)(fs * 2.1);
+    // ================= HTML =================
 
-        String divider    = "<div class=\"divider\">&#x2015;&#x2015;&#x2015; &#x2726; &#x2015;&#x2015;&#x2015;</div>";
-        String titleBlock = showTitle
-                ? "<h1>" + storyTitle + "</h1>" + divider
-                : "";
-        String styledBody = addDropCap(body, fs);
+    private String buildPageHtml(String body, boolean showTitle, int fs, int ts) {
+        String inkDark = toHex(INK_DARK);
+        String inkMid = toHex(INK_MID);
+        String inkGold = toHex(INK_GOLD);
+        String ornament = toHex(ORNAMENT);
+
+        String divider = "<div class=\"divider\">&#x2015;&#x2015;&#x2015; &#x2726; &#x2015;&#x2015;&#x2015;</div>";
+        String titleBlock = showTitle ? "<h1>" + storyTitle + "</h1>" + divider : "";
+        String styledBody = body;
 
         return "<html><head><style>"
-                + "body{font-family:'Georgia','Times New Roman',serif;"
-                +      "font-size:" + fs + "px;color:" + inkDark + ";"
-                +      "margin:0;padding:0;line-height:1.6;text-align:justify;}"
-                + "h1{font-size:" + ts + "px;letter-spacing:3px;color:" + inkMid + ";"
-                +    "text-align:center;margin:0 0 4px 0;font-variant:small-caps;font-style:italic;}"
-                + "p{margin:0 0 6px 0;text-indent:1.6em;}"
-                + "p.first{text-indent:0;margin-top:6px;}"
-                + "span.dropcap{float:left;font-size:" + dropSize + "px;line-height:0.75;"
-                +              "font-family:'Georgia',serif;color:" + inkMid + ";"
-                +              "padding-right:5px;padding-top:6px;font-weight:bold;font-style:italic;}"
-                + ".divider{text-align:center;color:" + ornament + ";font-size:" + divSize + "px;"
-                +           "letter-spacing:4px;margin:4px 0 8px 0;}"
-                + ".footer-line{text-align:center;color:" + inkGold + ";font-size:" + smallSize + "px;"
-                +              "font-style:italic;margin-top:6px;}"
+                + "body{font-family:Georgia,serif;font-size:" + fs + "px;color:" + inkDark + ";margin:0;padding:0;line-height:1.6;text-align:justify;}"
+                + "h1{font-size:" + ts + "px;color:" + inkMid + ";text-align:center;}"
+                + ".divider{text-align:center;color:" + ornament + ";margin:6px 0;}"
                 + "</style></head><body>"
                 + titleBlock + styledBody
                 + "</body></html>";
-    }
-
-    private static String addDropCap(String body, int fs) {
-        int pStart = body.indexOf("<p>");
-        if (pStart < 0) return body;
-        int idx = pStart + 3;
-        while (idx < body.length()) {
-            char c = body.charAt(idx);
-            if (c == '<') {
-                int end = body.indexOf('>', idx);
-                if (end >= 0) { idx = end + 1; continue; }
-                break;
-            }
-            if (Character.isLetter(c)) break;
-            idx++;
-        }
-        if (idx >= body.length()) return body;
-        char drop = body.charAt(idx);
-        return body.substring(0, pStart)
-                + "<p class=\"first\">"
-                + body.substring(pStart + 3, idx)
-                + "<span class=\"dropcap\">" + drop + "</span>"
-                + body.substring(idx + 1);
     }
 
     private static String toHex(Color c) {
         return String.format("#%02X%02X%02X", c.getRed(), c.getGreen(), c.getBlue());
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Scroll bar styling
-    // ══════════════════════════════════════════════════════════
+    // ================= SCROLLBAR =================
+
     private void styleScrollBar(JScrollBar bar) {
         bar.setOpaque(false);
         bar.setPreferredSize(new Dimension(6, 0));
         bar.setUI(new BasicScrollBarUI() {
             @Override protected void configureScrollBarColors() {
-                thumbColor            = new Color(0x8B, 0x5E, 0x3C, 180);
-                trackColor            = new Color(0, 0, 0, 0);
-                thumbDarkShadowColor  = new Color(0, 0, 0, 0);
-                thumbHighlightColor   = new Color(0, 0, 0, 0);
-                thumbLightShadowColor = new Color(0, 0, 0, 0);
+                thumbColor = new Color(0x8B, 0x5E, 0x3C, 180);
+                trackColor = new Color(0, 0, 0, 0);
             }
-            @Override protected JButton createDecreaseButton(int o) { return zero(); }
-            @Override protected JButton createIncreaseButton(int o) { return zero(); }
-            private JButton zero() {
-                JButton b = new JButton();
-                Dimension z = new Dimension(0, 0);
-                b.setPreferredSize(z); b.setMinimumSize(z); b.setMaximumSize(z);
-                return b;
-            }
+            @Override protected JButton createDecreaseButton(int o) { return new JButton(); }
+            @Override protected JButton createIncreaseButton(int o) { return new JButton(); }
         });
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Button factory
-    // ══════════════════════════════════════════════════════════
+    // ================= BUTTON =================
+
     private JButton makeStyledButton(String text) {
         JButton btn = new JButton(text) {
+            private boolean hover = false;
+            private boolean pressed = false;
 
-            @Override protected void paintComponent(Graphics g) {
+            {
+                setContentAreaFilled(false);
+                setFocusPainted(false);
+                setBorderPainted(false);
+                setOpaque(false);
+
+                setForeground(new Color(245, 235, 220));
+                setFont(new Font("Serif", Font.BOLD, 14));
+
+                addMouseListener(new java.awt.event.MouseAdapter() {
+                    @Override
+                    public void mouseEntered(java.awt.event.MouseEvent e) {
+                        hover = true;
+                        repaint();
+                    }
+
+                    @Override
+                    public void mouseExited(java.awt.event.MouseEvent e) {
+                        hover = false;
+                        repaint();
+                    }
+
+                    @Override
+                    public void mousePressed(java.awt.event.MouseEvent e) {
+                        pressed = true;
+                        repaint();
+                    }
+
+                    @Override
+                    public void mouseReleased(java.awt.event.MouseEvent e) {
+                        pressed = false;
+                        repaint();
+                    }
+                });
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
+
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                         RenderingHints.VALUE_ANTIALIAS_ON);
 
-                boolean hover = getModel().isRollover();
-                boolean press = getModel().isPressed();
+                int width = getWidth();
+                int height = getHeight();
 
-                Color top = hover ? new Color(170,110,40) : new Color(120,70,20);
-                Color bot = hover ? new Color(120,80,30)  : new Color(80,40,10);
+                int arc = 20;
 
-                if (press) {
-                    top = top.darker();
-                    bot = bot.darker();
-                }
+                // Base gradient colors
+                Color top = INK_MID;
+                Color bottom = INK_DARK;
 
-                g2.setPaint(new GradientPaint(0,0,top,0,getHeight(),bot));
-                g2.fillRoundRect(0,0,getWidth(),getHeight(),16,16);
-
-                // Glow effect
                 if (hover) {
-                    g2.setColor(new Color(255, 215, 120, 80));
-                    g2.setStroke(new BasicStroke(3f));
-                    g2.drawRoundRect(2,2,getWidth()-4,getHeight()-4,16,16);
+                    top = INK_GOLD;
+                    bottom = INK_MID;
                 }
 
-                g2.setColor(new Color(220,180,90));
-                g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2,16,16);
+                if (pressed) {
+                    top = INK_DARK;
+                    bottom = new Color(0x2A, 0x10, 0x03);
+                }
 
-                g2.setFont(new Font("Serif", Font.BOLD, 12));
-                FontMetrics fm = g2.getFontMetrics();
+                GradientPaint gp = new GradientPaint(
+                        0, 0, top,
+                        0, height, bottom
+                );
 
-                int tx = (getWidth()-fm.stringWidth(getText()))/2;
-                int ty = (getHeight()+fm.getAscent())/2 - 2;
+                // Fill rounded background
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, 0, width, height, arc, arc);
 
-                g2.setColor(Color.BLACK);
-                g2.drawString(getText(), tx+1, ty+1);
-
-                g2.setColor(new Color(255,230,170));
-                g2.drawString(getText(), tx, ty);
+                // Border glow
+                g2.setColor(ORNAMENT);
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(1, 1, width - 3, height - 3, arc, arc);
 
                 g2.dispose();
+
+                super.paintComponent(g);
             }
         };
 
-        btn.setOpaque(false);
-        btn.setContentAreaFilled(false);
-        btn.setBorderPainted(false);
         btn.setFocusPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setContentAreaFilled(false);
+        btn.setOpaque(false);
 
         return btn;
-    }
-
-    // ══════════════════════════════════════════════════════════
-    //  Background panel
-    // ══════════════════════════════════════════════════════════
-    private class BgPanel extends JPanel {
-        private final Image img;
-        BgPanel(String path) {
-            URL url = getClass().getResource(path);
-            img = (url != null) ? new ImageIcon(url).getImage() : null;
-            setOpaque(true);
-            setBackground(Color.BLACK);
-        }
-        @Override protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            if (img == null) return;
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g2.drawImage(img, 0, 0, getWidth(), getHeight(), null);
-            g2.dispose();
-        }
     }
 }
