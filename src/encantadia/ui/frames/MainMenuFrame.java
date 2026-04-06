@@ -128,27 +128,48 @@ public class MainMenuFrame extends JFrame {
         bg.setBounds(0, 0, w, h);
         columns.setBounds(0, 0, w, h);
 
-        // Title
-        int titleW = (int)(w * 0.42);
-        int titleH = (int)(titleW * 0.28);
-        titlePanel.setBounds((w-titleW)/2, (int)(h*0.04), titleW, titleH);
+        for (JButton b : new JButton[]{PVPButton, PVEButton, arcadeButton, exitGameButton}) {
+            b.setAlignmentX(Component.CENTER_ALIGNMENT);
+        }
 
-        // Holder
-        int holderW = (int)(w * 0.38);
-        int holderH = (int)(h * 0.58);
+        // HOLDER
+        int holderW = (int)(w * 0.55);
+        int holderH = (int)(h * 0.85);
         int holderX = (w - holderW) / 2;
-        int holderY = (int)(h*0.04) + titleH + (int)(h*0.015);
+        int holderY = (int)(h * 0.15);
         holderPanel.setBounds(holderX, holderY, holderW, holderH);
 
-        // Buttons inside holder
-        int btnW      = (int)(holderW * 0.76);
-        int btnH      = (int)(btnW * 0.24);
-        int usableH   = (int)(holderH * 0.75);
-        int gap       = Math.max(10, (usableH - btnH*3) / 4);
+        // TITLE
+        int titleW = (int)(w * 0.65);
+        int titleH = (int)(titleW * 0.30);
+        int titleX = (w - titleW) / 2;
+        int titleY = (int)(h * 0.01);
+        titlePanel.setBounds(titleX, titleY, titleW, titleH);
+
+
+        // BUTTONS inside holder
+        int btnW = (int)(holderW * 0.60);
+        int btnH = (int)(btnW * 0.38);
+        int gap  = (int)(holderH * 0.01);
+
+        // MAIN buttons (same size)
+        Dimension mainSize = new Dimension(btnW, btnH);
         for (JButton b : new JButton[]{PVPButton, PVEButton, arcadeButton}) {
-            Dimension d = new Dimension(btnW, btnH);
-            b.setPreferredSize(d); b.setMinimumSize(d); b.setMaximumSize(d);
+            b.setPreferredSize(mainSize);
+            b.setMinimumSize(mainSize);
+            b.setMaximumSize(mainSize);
         }
+
+        // EXIT button (different size)
+        int exitW = (int)(btnW * 0.60);
+        int exitH = (int)(exitW * 0.45);
+
+        Dimension exitSize = new Dimension(exitW, exitH);
+        exitGameButton.setPreferredSize(exitSize);
+        exitGameButton.setMinimumSize(exitSize);
+        exitGameButton.setMaximumSize(exitSize);
+
+        // Layout
         buttonsInsideHolder.setBounds(0, 0, holderW, holderH);
         buttonsInsideHolder.removeAll();
         buttonsInsideHolder.add(Box.createVerticalGlue());
@@ -157,16 +178,12 @@ public class MainMenuFrame extends JFrame {
         buttonsInsideHolder.add(PVEButton);
         buttonsInsideHolder.add(Box.createVerticalStrut(gap));
         buttonsInsideHolder.add(arcadeButton);
-        buttonsInsideHolder.add(Box.createVerticalGlue());
 
-        // Exit
-        int exitW = (int)(btnW * 0.46);
-        int exitH = (int)(exitW * 0.45);
-        Dimension ed = new Dimension(exitW, exitH);
-        exitGameButton.setPreferredSize(ed);
-        exitGameButton.setMinimumSize(ed);
-        exitGameButton.setMaximumSize(ed);
-        exitRow.setBounds((w-exitW)/2, holderY+holderH+(int)(h*0.008), exitW, exitH+4);
+        // push exit to bottom
+        buttonsInsideHolder.add(Box.createVerticalGlue());
+        buttonsInsideHolder.add(exitGameButton);
+        buttonsInsideHolder.add(Box.createVerticalStrut(gap));
+
 
         // ── Trophy — RIGHT side gap, proper square bounding box ──
         // The right pillar occupies approximately the rightmost 13 % of the frame.
