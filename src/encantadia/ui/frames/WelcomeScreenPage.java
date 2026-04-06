@@ -7,7 +7,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import encantadia.BackstoryShowcase;
+import encantadia.ui.frames.MainMenuFrame;
 import encantadia.ScreenManager;
 import encantadia.story.StoryType;
 
@@ -18,6 +18,7 @@ public class WelcomeScreenPage extends JFrame {
     private static final String BTN_PLAY     = "/resources/playButton (1).png";
     private static final String BTN_OPTIONS  = "/resources/optionsButton (1).png";
     private static final String BTN_EXIT     = "/resources/exitButton (1).png";
+
 
     private JButton playButton;
     private JButton optionButton;
@@ -68,12 +69,12 @@ public class WelcomeScreenPage extends JFrame {
         });
 
         playButton.addActionListener(e -> {
-            new BackstoryShowcase(StoryType.GAME_LORE);
+            new MainMenuFrame();
             dispose();
         });
 
         optionButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Options coming soon!");
+            new OptionFrame();
         });
 
         exitButton.addActionListener(e -> {
@@ -130,9 +131,9 @@ public class WelcomeScreenPage extends JFrame {
 
         title.setBounds(titleX, titleY, titleW, titleH);
 
-        int btnW = (int)(320 * scale);
-        int btnH = (int)(btnW * 0.30);
-        int gap  = (int)(25 * scale);
+        int btnW = (int)(190 * scale);
+        int btnH = (int)(btnW * 0.40);
+        int gap  = (int)(40 * scale);
 
         int totalH = (btnH * 3) + (gap * 2);
         int startY = (int)(h * 0.60 - totalH / 2);
@@ -168,22 +169,22 @@ public class WelcomeScreenPage extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                         RenderingHints.VALUE_ANTIALIAS_ON);
 
-                // ✨ smooth pulsing glow
+                //smooth pulsing glow
                 glowPulse += 0.04f;
                 float alpha = 0.5f + (float)Math.sin(glowPulse) * 0.25f;
 
-                // 🌟 outer glow
+                //outer glow
                 g2.setComposite(AlphaComposite.getInstance(
                         AlphaComposite.SRC_OVER, alpha));
                 g2.setColor(new Color(153, 102, 204));
                 g2.fillRoundRect(0, 0, w, h, 25, 25);
 
-                // 🧊 inner plate
+                //inner plate
                 g2.setComposite(AlphaComposite.SrcOver);
                 g2.setColor(new Color(40, 30, 60, 200));
                 g2.fillRoundRect(4, 4, w - 8, h - 8, 20, 20);
 
-                // 🖼️ button image (scaled on hover)
+                // button image (scaled on hover)
                 int dw = (int)(w * scale);
                 int dh = (int)(h * scale);
                 int dx = (w - dw) / 2;
@@ -196,7 +197,7 @@ public class WelcomeScreenPage extends JFrame {
                     g2.drawString(fallbackText, w / 2 - 20, h / 2);
                 }
 
-                // ✨ mystical shimmer line (very subtle)
+                // mystical shimmer line (very subtle)
                 GradientPaint shimmer = new GradientPaint(
                         0, 0,
                         new Color(255, 255, 255, 40),
@@ -276,10 +277,10 @@ public class WelcomeScreenPage extends JFrame {
                 g2.drawImage(img, 0, 0, w, h, null);
             }
 
-            // ☁️ CLOUD LAYERS
+            // CLOUD LAYERS
 
 
-            // 🌑 VIGNETTE
+            // VIGNETTE
             g2.setPaint(new RadialGradientPaint(
                     new Point(w/2, h/2),
                     w * 0.8f,
