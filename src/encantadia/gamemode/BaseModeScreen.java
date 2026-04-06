@@ -133,43 +133,46 @@ public abstract class BaseModeScreen extends JFrame {
 
         bg.setBounds(0, 0, W, H);
 
-        // ── Holder: capped so it never grows too large ─────────
-        // Base size is 1024x768. Scale proportionally but cap at 1.4x
+        // ── SCALE ───────────────────────────────────────
         double scale = Math.min(W / 1024.0, H / 768.0);
-        scale = Math.min(scale, 1.4);  // never bigger than 1.4x the base
+        scale = Math.min(scale, 1.4);
 
-        int holderW = (int)(370 * scale);  // 370px at 1024x768
-        int holderH = (int)(480 * scale);  // 480px at 1024x768
+        // ── HOLDER ──────────────────────────────────────
+        int holderW = (int)(590 * scale);
+        int holderH = (int)(holderW * 1.2);
         int holderX = (W - holderW) / 2;
-        int holderY = (H - holderH) / 2;  // vertically centered
+        int holderY = (H - holderH) / (int)1.5;
+
         holderPanel.setBounds(holderX, holderY, holderW, holderH);
 
-        // ── Banner: straddles TOP edge of holder ──────────────
-        int bannerW = (int)(260 * scale);
-        int bannerH = (int)(52  * scale);
+        // ── BANNER: TOP CENTER (INSIDE HOLDER) ──────────
+        int bannerW = (int)(270 * scale);
+        int bannerH = (int)(100 * scale);
         int bannerX = holderX + (holderW - bannerW) / 2;
-        int bannerY = holderY - (bannerH / 2);
+        int bannerY = holderY + (int)(14 * scale);
+
         modeBtnPanel.setBounds(bannerX, bannerY, bannerW, bannerH);
 
-        // ── Question: upper portion of holder ─────────────────
-        int qW = (int)(280 * scale);
-        int qH = (int)(130 * scale);
+        // ── QUESTION: CENTER (slightly higher) ──────────
+        int qW = (int)(320 * scale);
+        int qH = (int)(140 * scale);
         int qX = holderX + (holderW - qW) / 2;
-        int qY = holderY + (int)(80 * scale);
+        int qY = holderY + (holderH / 2) - qH - (int)(14 * scale);
+
         questionPanel.setBounds(qX, qY, qW, qH);
 
-        // ── YES / NO buttons ──────────────────────────────────
-        int btnH = (int)(42 * scale);
-        int yesW = (int)(btnH * 2.6);
-        int noW  = (int)(btnH * 2.2);
-        int gap  = (int)(18 * scale);
+        // ── YES / NO BUTTONS: BELOW QUESTION ────────────
+        int btnH = (int)(55 * scale);
+        int yesW = (int)(btnH * 2.5);
+        int noW  = (int)(btnH * 2.5);
+        int gap  = (int)(50 * scale);
 
         setFull(yesButton, yesW, btnH);
         setFull(noButton,  noW,  btnH);
 
         int rowW = yesW + noW + gap;
         int rowX = holderX + (holderW - rowW) / 2;
-        int rowY = holderY + (int)(290 * scale);
+        int rowY = qY + qH + (int)(50 * scale);
 
         yesNoRow.removeAll();
         yesNoRow.add(yesButton);
@@ -177,20 +180,20 @@ public abstract class BaseModeScreen extends JFrame {
         yesNoRow.add(noButton);
         yesNoRow.setBounds(rowX, rowY, rowW, btnH + 4);
 
-        // ── EXIT: straddles BOTTOM edge of holder ─────────────
-        int exitW = (int)(120 * scale);
-        int exitH = (int)(40  * scale);
+        // ── EXIT: BOTTOM INSIDE HOLDER ──────────────────
+        int exitW = (int)(200 * scale);
+        int exitH = (int)(90 * scale);
 
         setFull(exitButton, exitW, exitH);
 
-        int exitX = (W - exitW) / 2;
-        int exitY = holderY + holderH - (exitH / 2);
+        int exitX = holderX + (holderW - exitW) / 2;
+        int exitY = holderY + holderH - exitH - (int)(30 * scale);
 
         exitRow.removeAll();
         exitRow.add(exitButton);
         exitRow.setBounds(exitX, exitY, exitW, exitH + 4);
 
-        // Ensure correct layer order every time
+        // ── LAYERS ─────────────────────────────────────
         pane.setLayer(holderPanel,   JLayeredPane.PALETTE_LAYER);
         pane.setLayer(modeBtnPanel,  JLayeredPane.MODAL_LAYER);
         pane.setLayer(questionPanel, JLayeredPane.MODAL_LAYER);
