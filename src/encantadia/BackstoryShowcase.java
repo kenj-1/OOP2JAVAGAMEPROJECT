@@ -16,10 +16,8 @@ public class BackstoryShowcase extends JFrame {
 
     private static final String BG_PATH        = "/resources/background (3).png";
     private static final String PARCHMENT_PATH = "/resources/base1SBS.png";
-
     private static final int PARAGRAPHS_PER_PAGE = 10;
     private static final int CHAR_DELAY_MS       = 14;
-
     private static final double PARCHMENT_WIDTH_RATIO  = 0.60;
     private static final double PARCHMENT_HEIGHT_RATIO = 0.75;
 
@@ -32,6 +30,7 @@ public class BackstoryShowcase extends JFrame {
     private JButton continueButton;
     private JButton skipButton;
     private JLabel pageLabel;
+    private JButton backButton;
 
     private JPanel parchmentPanel;
     private JPanel innerPanel;
@@ -42,6 +41,8 @@ public class BackstoryShowcase extends JFrame {
     private final String[] paragraphs;
     private final String storyTitle;
     private final Runnable onFinish;
+    private final Runnable onBack;
+
 
     private final int totalPages;
     private int currentPage = 0;
@@ -61,22 +62,22 @@ public class BackstoryShowcase extends JFrame {
         this(
                 GameStories.getParagraphs(storyType),
                 GameStories.getTitle(storyType),
-                () -> {
-                    if (storyType == StoryType.GAME_LORE) {
-                        new MainMenuFrame();
-                    } else {
-                        new CharacterSelectionFrame(
-                                gameModeType != null ? gameModeType : GameModeType.PVE
-                        );
-                    }
-                }
+
+                // BEGIN button → Character Selection
+                () -> new CharacterSelectionFrame(
+                        gameModeType != null ? gameModeType : GameModeType.PVE
+                ),
+
+                // BACK button → Main Menu
+                () -> new MainMenuFrame()
         );
     }
 
-    public BackstoryShowcase(String[] paragraphs, String title, Runnable onFinish) {
+    public BackstoryShowcase(String[] paragraphs, String title, Runnable onFinish, Runnable onBack) {
         this.paragraphs = paragraphs;
         this.storyTitle = title;
         this.onFinish = onFinish;
+        this.onBack = onBack;
         this.totalPages = (int) Math.ceil((double) paragraphs.length / PARAGRAPHS_PER_PAGE);
 
         setTitle("Encantadia – " + title);
@@ -169,8 +170,13 @@ public class BackstoryShowcase extends JFrame {
         skipButton = makeStyledButton("Skip »»");
         skipButton.addActionListener(e -> handleSkip());
 
+        backButton = makeStyledButton("« Back");
+        backButton.addActionListener(e -> handleBack());
+
         JPanel rightButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rightButtons.setOpaque(false);
+
+        rightButtons.add(backButton);
         rightButtons.add(skipButton);
         rightButtons.add(continueButton);
 
@@ -186,6 +192,11 @@ public class BackstoryShowcase extends JFrame {
         innerPanel.add(btnRow, BorderLayout.SOUTH);
 
         parchmentPanel.add(innerPanel, BorderLayout.CENTER);
+    }
+
+    private void handleBack() {
+        dispose();
+        if (onBack != null) onBack.run();
     }
 
     // ================= LAYOUT =================
@@ -216,6 +227,7 @@ public class BackstoryShowcase extends JFrame {
 
         continueButton.setPreferredSize(new Dimension(btnW, btnH));
         skipButton.setPreferredSize(new Dimension(btnW, btnH));
+        backButton.setPreferredSize(new Dimension(btnW, btnH));
 
         fontSize = (int)(11 * scale);
         titleSize = (int)(fontSize * 1.35);
