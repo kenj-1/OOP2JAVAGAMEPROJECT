@@ -429,12 +429,23 @@ public class ArcadeTowerFrame extends JFrame {
     private void onNextChallenge() {
         Character nextEnemy = arcadeManager.getCurrentEnemy();
         if (nextEnemy == null) return;
+
         dispose();
+
         new BackstoryShowcase(
                 CharacterStories.getEnemyStory(nextEnemy),
                 CharacterStories.getEnemyTitle(nextEnemy),
+
+                // onFinish → go to battle
                 () -> SwingUtilities.invokeLater(
-                        () -> new ArcadeModeBattleFrame(player, arcadeManager)));
+                        () -> new ArcadeModeBattleFrame(player, arcadeManager)
+                ),
+
+                // onBack → go back to tower screen
+                () -> SwingUtilities.invokeLater(
+                        () -> new ArcadeTowerFrame(player, arcadeManager)
+                )
+        );
     }
 
     // ══════════════════════════════════════════════════════════
