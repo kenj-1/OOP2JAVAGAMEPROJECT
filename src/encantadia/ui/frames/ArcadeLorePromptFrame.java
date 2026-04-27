@@ -12,9 +12,7 @@ import java.net.URL;
 
 /**
  * Styled prompt that appears when Arcade Mode is selected from the main menu.
- * Reuses all MainMenuFrame background assets so it blends seamlessly.
- * "YES" → shows arcade lore in BackstoryShowcase → CharacterSelectionFrame
- * "NO"  → goes straight to CharacterSelectionFrame
+ * Ensures aspect ratio preservation of backgrounds and interactive panels.
  */
 public class ArcadeLorePromptFrame extends JFrame {
 
@@ -22,7 +20,6 @@ public class ArcadeLorePromptFrame extends JFrame {
     private static final String COLUMNS_PATH = "/resources/columns.png";
     private static final String HOLDER_PATH  = "/resources/mainMenuHolder.png";
 
-    // Arcade mode lore paragraphs (hardcoded so no StoryType dependency)
     private static final String[] ARCADE_LORE = {
             "<p>The ancient arenas of Encantadia were built long before the Sang'gres — monuments to the belief that strength proved without witness means nothing.</p>",
             "<p>Now they serve a new purpose.</p>",
@@ -33,6 +30,7 @@ public class ArcadeLorePromptFrame extends JFrame {
     public ArcadeLorePromptFrame() {
         setTitle("Encantadia: Echoes of the Gem — Arcade Mode");
         setSize(1024, 768);
+        setMinimumSize(new Dimension(800, 600));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         buildUI();
@@ -59,20 +57,17 @@ public class ArcadeLorePromptFrame extends JFrame {
         lp.add(columns, JLayeredPane.PALETTE_LAYER);
         lp.add(holder,  JLayeredPane.MODAL_LAYER);
 
-        // ── Content inside holder ─────────────────────────────
         holder.setLayout(new GridBagLayout());
         JPanel inner = new JPanel();
         inner.setOpaque(false);
         inner.setLayout(new BoxLayout(inner, BoxLayout.Y_AXIS));
 
-        // Question label (multi-line)
         String html = "<html><div style='text-align:center; font-family:sans-serif; font-weight:bold; font-size:18px; color:#FFF5DC;'>"
                 + "DO YOU WISH TO<br>UNVEIL THE<br>FORGOTTEN PAST?"
                 + "</div></html>";
         JLabel question = new JLabel(html, SwingConstants.CENTER);
         question.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Buttons
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 0));
         btnRow.setOpaque(false);
         JButton yesBtn = makeHolderButton("YES");
@@ -86,12 +81,8 @@ public class ArcadeLorePromptFrame extends JFrame {
             new BackstoryShowcase(
                     ARCADE_LORE,
                     "The Ancient Arenas",
-
-                    // Begin / Finish
                     () -> new CharacterSelectionFrame(GameModeType.ARCADE),
-
-                    // Back → go to main menu
-                    () -> new encantadia.ui.frames.MainMenuFrame()
+                    () -> new MainMenuFrame()
             );
         });
 
@@ -108,7 +99,6 @@ public class ArcadeLorePromptFrame extends JFrame {
 
         holder.add(inner);
 
-        // ── Resize ────────────────────────────────────────────
         addComponentListener(new ComponentAdapter() {
             @Override public void componentResized(ComponentEvent e) {
                 layout(lp, bg, columns, holder);
@@ -123,8 +113,9 @@ public class ArcadeLorePromptFrame extends JFrame {
         bg.setBounds(0, 0, w, h);
         col.setBounds(0, 0, w, h);
 
-        int hw = (int)(w * 0.44);
-        int hh = (int)(h * 0.64);
+        // Improved math to stay responsive but limit maximum stretch
+        int hw = Math.min(600, (int)(w * 0.55));
+        int hh = Math.min(500, (int)(h * 0.70));
         holder.setBounds((w - hw) / 2, (h - hh) / 2, hw, hh);
 
         lp.revalidate();
@@ -137,10 +128,7 @@ public class ArcadeLorePromptFrame extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 boolean h = getModel().isRollover();
-                g2.setPaint(new GradientPaint(0, 0,
-                        h ? new Color(170, 110, 40) : new Color(120, 70, 20),
-                        0, getHeight(),
-                        h ? new Color(120, 80, 30) : new Color(80, 40, 10)));
+                g2.setPaint(new GradientPaint(0, 0, h ? new Color(170, 110, 40) : new Color(120, 70, 20), 0, getHeight(), h ? new Color(120, 80, 30) : new Color(80, 40, 10)));
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
                 if (h) {
                     g2.setColor(new Color(255, 215, 120, 80));
@@ -166,10 +154,29 @@ public class ArcadeLorePromptFrame extends JFrame {
         return btn;
     }
 
-    // ── Image panels (identical pattern to MainMenuFrame) ─────
     private Image loadImage(String path) {
         URL url = getClass().getResource(path);
         return url != null ? new ImageIcon(url).getImage() : null;
+    }
+
+    protected void drawImageFill(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return;
+        int iw = img.getWidth(null), ih = img.getHeight(null);
+        if (iw <= 0 || ih <= 0) return;
+        double scale = Math.max((double) w / iw, (double) h / ih);
+        int dw = (int) (iw * scale), dh = (int) (ih * scale);
+        int dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+        g2.drawImage(img, dx, dy, dw, dh, null);
+    }
+
+    protected void drawImageProportional(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return;
+        int iw = img.getWidth(null), ih = img.getHeight(null);
+        if (iw <= 0 || ih <= 0) return;
+        double scale = Math.min((double) w / iw, (double) h / ih);
+        int dw = (int) (iw * scale), dh = (int) (ih * scale);
+        int dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+        g2.drawImage(img, dx, dy, dw, dh, null);
     }
 
     private class BackgroundPanel extends JPanel {
@@ -177,27 +184,40 @@ public class ArcadeLorePromptFrame extends JFrame {
         BackgroundPanel(String p) { img = loadImage(p); setOpaque(true); setBackground(Color.BLACK); }
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (img != null) g.drawImage(img, 0, 0, getWidth(), getHeight(), null);
+            if (img != null) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                drawImageFill(g2, img, 0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
         }
     }
+
     private class ScaledPanel extends JPanel {
         private final Image img;
         ScaledPanel(String p) { img = loadImage(p); setOpaque(false); }
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (img != null) g.drawImage(img, 0, 0, getWidth(), getHeight(), null);
+            if (img != null) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                drawImageFill(g2, img, 0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
         }
     }
+
     private class HolderPanel extends JPanel {
         private final Image img;
         HolderPanel(String p) { img = loadImage(p); setOpaque(false); }
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (img == null) return;
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g2.drawImage(img, 0, 0, getWidth(), getHeight(), null);
-            g2.dispose();
+            if (img != null) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                drawImageProportional(g2, img, 0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
         }
     }
 }

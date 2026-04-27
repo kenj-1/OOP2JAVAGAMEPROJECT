@@ -8,6 +8,7 @@ import encantadia.battle.result.TurnResult;
 import encantadia.battle.skill.Skill;
 import encantadia.characters.*;
 import encantadia.characters.Character;
+import encantadia.characters.animation.CharacterAnimator;
 import encantadia.ui.frames.ArcadeTowerFrame;
 import encantadia.ui.frames.ArcadeVictoryFrame;
 import encantadia.ui.frames.MainMenuFrame;
@@ -15,11 +16,16 @@ import encantadia.ui.frames.MainMenuFrame;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.AffineTransform;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * ArcadeModeBattleFrame
+ * FIXED: Restored the missing drawFlankingTimers method and fixed the method call.
+ */
 public class ArcadeModeBattleFrame extends JFrame {
 
     // ── Timers ────────────────────────────────────────────────
@@ -30,10 +36,16 @@ public class ArcadeModeBattleFrame extends JFrame {
     private javax.swing.Timer matchTimer;
     private int               matchTimeLeft = MATCH_DURATION_SECONDS;
 
-    // ── Resources ─────────────────────────────────────────────
-    private static final String BG_PATH         = "/resources/backgroundArcade.png";
+    private static final String BG_PATH          = "/resources/backgroundArcade.png";
     private static final int    ENEMY_TURN_DELAY = 1100;
-    private boolean ultimateUnlocked = false;
+
+    // ── Arcade Exclusive Mechanics ────────────────────────────
+    private boolean           ultimateUnlocked = false;
+    private int               summonCharges    = 3;
+    private boolean           isSummoning      = false;
+    private Character         assistCharacter  = null;
+    private CharacterAnimator assistAnimator   = null;
+    private int[]             assistDurations  = new int[]{1600};
 
     private static final String[] FRAME_IMGS = {
             "/resources/tyroneFrame (1).png", "/resources/elanFrame (1).png",
@@ -41,11 +53,12 @@ public class ArcadeModeBattleFrame extends JFrame {
             "/resources/flamaraFrame (1).png", "/resources/deaFrame (1).png",
             "/resources/adamusFrame (1).png",  "/resources/teraFrame (1).png"
     };
+
     private static final String[] CHAR_NAMES = {
-            "Tyrone","Elan","Claire","Dirk","Flamara","Dea","Adamus","Tera"
+            "Tyrone", "Makelan Shere", "Claire", "Dirk", "Flamara", "Dea", "Adamus", "Tera"
     };
 
-    // ── Colors ────────────────────────────────────────────────
+    // ── Color Palette ──────────────────────────────────────────
     private static final Color PLAYER_CLR = new Color(0x2E, 0x8B, 0x57);
     private static final Color ENEMY_CLR  = new Color(0xB0, 0x2A, 0x2A);
     private static final Color BOSS_CLR   = new Color(0xAA, 0x00, 0xFF);
@@ -56,14 +69,22 @@ public class ArcadeModeBattleFrame extends JFrame {
     private static final Color RED_CRIT   = new Color(0xCC, 0x22, 0x22);
     private static final Color GREEN_RDY  = new Color(0x60, 0xCC, 0x60);
 
-    // ── Characters & engine ───────────────────────────────────
+    // ── Engine & Controllers ──────────────────────────────────
     private final Character         playerCharacter;
     private final Character         enemyCharacter;
     private final ArcadeModeManager arcadeManager;
     private TurnManager             turnManager;
     private volatile boolean        processingTurn = false;
+    private volatile boolean        timeUpTriggered = false;
 
-    // ── UI refs ───────────────────────────────────────────────
+    private CharacterAnimator playerAnimator;
+    private CharacterAnimator enemyAnimator;
+    private float playerFlashAlpha = 0f;
+    private float enemyFlashAlpha  = 0f;
+    private float glowTick         = 0f;
+    private Timer glowAnimTimer;
+
+    // ── UI Refs ───────────────────────────────────────────────
     private BattleCanvas battleCanvas;
     private JPanel       skillsLayer;
     private JPanel       overlayLayer;
@@ -71,9 +92,6 @@ public class ArcadeModeBattleFrame extends JFrame {
     private JButton[]    skillBtns = new JButton[4];
     private JLabel[]     cdLabels  = new JLabel[4];
 
-    // ══════════════════════════════════════════════════════════
-    //  Constructor
-    // ══════════════════════════════════════════════════════════
     public ArcadeModeBattleFrame(Character player, ArcadeModeManager manager) {
         this.playerCharacter = player;
         this.arcadeManager   = manager;
@@ -88,6 +106,9 @@ public class ArcadeModeBattleFrame extends JFrame {
         enemyCharacter.reset();
         this.turnManager = new TurnManager(playerCharacter, enemyCharacter);
 
+        this.playerAnimator = CharacterAnimator.forCharacter(playerCharacter);
+        this.enemyAnimator  = CharacterAnimator.forCharacter(enemyCharacter);
+
         boolean isBoss = arcadeManager.isFinalBoss();
         int idx   = arcadeManager.getCurrentIndex() + 1;
         int total = arcadeManager.getTotalEnemies();
@@ -97,6 +118,19 @@ public class ArcadeModeBattleFrame extends JFrame {
         setMinimumSize(new Dimension(800, 600));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+
+        glowAnimTimer = new Timer(20, e -> {
+            glowTick += 0.08f;
+            if (playerFlashAlpha > 0) playerFlashAlpha = Math.max(0, playerFlashAlpha - 0.04f);
+            if (enemyFlashAlpha > 0)  enemyFlashAlpha  = Math.max(0, enemyFlashAlpha  - 0.04f);
+            if (battleCanvas != null) battleCanvas.repaint();
+        });
+
+        // Setup persistent summon state if Ultimate was previously drafted
+        if (playerCharacter.getSkills().size() >= 4) {
+            ultimateUnlocked = true;
+            restoreAssistAnimator();
+        }
 
         buildUI(isBoss, idx, total);
         registerHotkeys();
@@ -123,13 +157,14 @@ public class ArcadeModeBattleFrame extends JFrame {
     public void dispose() {
         stopMatchTimer();
         stopTurnTimer();
+        if (glowAnimTimer != null) glowAnimTimer.stop();
+        if (playerAnimator != null) playerAnimator.dispose();
+        if (enemyAnimator != null) enemyAnimator.dispose();
+        if (assistAnimator != null) assistAnimator.dispose();
         ScreenManager.unregister(this);
         super.dispose();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  UI
-    // ══════════════════════════════════════════════════════════
     private void buildUI(boolean isBoss, int idx, int total) {
         JLayeredPane lp = new JLayeredPane();
         lp.setLayout(null);
@@ -195,28 +230,19 @@ public class ArcadeModeBattleFrame extends JFrame {
         battleLog.setLineWrap(true);
         battleLog.setWrapStyleWord(true);
 
-        JScrollPane scroll = new JScrollPane(battleLog,
-                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.setBorder(null);
+        JScrollPane scroll = new JScrollPane(battleLog, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setOpaque(false); scroll.getViewport().setOpaque(false); scroll.setBorder(null);
 
         JPanel logHolder = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setColor(new Color(0, 0, 0, 150));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
-                g2.setColor(new Color(0xC8, 0xA0, 0x28, 70));
-                g2.setStroke(new BasicStroke(1));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
+                g2.setColor(new Color(0, 0, 0, 150)); g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                g2.setColor(new Color(0xC8, 0xA0, 0x28, 70)); g2.setStroke(new BasicStroke(1)); g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
                 g2.dispose(); super.paintComponent(g);
             }
         };
-        logHolder.setOpaque(false);
-        logHolder.add(scroll, BorderLayout.CENTER);
-        skillsLayer.add(logHolder);
-        skillsLayer.putClientProperty("log", logHolder);
+        logHolder.setOpaque(false); logHolder.add(scroll, BorderLayout.CENTER);
+        skillsLayer.add(logHolder); skillsLayer.putClientProperty("log", logHolder);
     }
 
     private void rebuildSkillSlots() {
@@ -224,10 +250,16 @@ public class ArcadeModeBattleFrame extends JFrame {
         for (int i = 0; i < 4; i++) {
             if (skillBtns[i] == null) continue;
             if (i < skills.size()) {
-                skillBtns[i].setText(skills.get(i).getName());
+                if (i == 3 && ultimateUnlocked) {
+                    skillBtns[i].setText(skills.get(i).getName() + " (" + summonCharges + ")");
+                    cdLabels[i].setText(summonCharges > 0 ? "READY" : "EXHAUSTED");
+                    cdLabels[i].setForeground(summonCharges > 0 ? new Color(0xFF,0xAA,0x30) : RED_CRIT);
+                } else {
+                    skillBtns[i].setText(skills.get(i).getName());
+                    cdLabels[i].setText("READY");
+                    cdLabels[i].setForeground(GREEN_RDY);
+                }
                 skillBtns[i].setEnabled(false);
-                cdLabels[i].setText("READY");
-                cdLabels[i].setForeground(GREEN_RDY);
             } else {
                 skillBtns[i].setText("—");
                 skillBtns[i].setEnabled(false);
@@ -255,35 +287,156 @@ public class ArcadeModeBattleFrame extends JFrame {
     }
 
     // ══════════════════════════════════════════════════════════
-    //  Turn logic
+    //  Combat Logic & Tag-Team Summons
     // ══════════════════════════════════════════════════════════
+
     private void onPlayerSkill(int si) {
+        if (timeUpTriggered) return;
         stopTurnTimer();
+        if (matchTimer != null && matchTimer.isRunning()) matchTimer.stop();
         if (processingTurn || !turnManager.isPlayerTurn()) return;
+
+        if (si == 3) {
+            if (summonCharges <= 0) {
+                if (matchTimeLeft > 0) matchTimer.start();
+                return;
+            }
+            executeSummonAssist(si);
+            return;
+        }
+
         processingTurn = true;
         setPlayerEnabled(false);
-        TurnResult res = turnManager.executeSkill(playerCharacter, enemyCharacter, si);
-        flushResult(res); refreshUI();
-        if (res.isTargetDefeated()) { onPlayerWon(); return; }
-        if (res.isTurnStolen())     { setPlayerEnabled(true); processingTurn = false; return; }
-        turnManager.advanceTurn(); refreshCdRow(); updateTurnState();
-        new Timer(ENEMY_TURN_DELAY, e -> doEnemyTurn()) {{ setRepeats(false); start(); }};
+        if (playerAnimator != null) playerAnimator.toSkill(si);
+
+        int durationMs  = getSkillDuration(playerCharacter, si);
+        int impactDelay = (int)(durationMs * 0.65);
+
+        Timer impactTimer = new Timer(impactDelay, e -> {
+            ((Timer)e.getSource()).stop();
+            TurnResult res = turnManager.executeSkill(playerCharacter, enemyCharacter, si);
+            flushResult(res);
+
+            enemyFlashAlpha = 1.0f;
+            if (enemyAnimator != null) enemyAnimator.triggerHit(); // Knockback
+            refreshUI();
+
+            Timer recoveryTimer = new Timer((durationMs - impactDelay) + 150, ev -> {
+                ((Timer)ev.getSource()).stop();
+                if (matchTimeLeft > 0 && !timeUpTriggered) matchTimer.start();
+
+                if (res.isTargetDefeated()) { onPlayerWon(); return; }
+                if (res.isTurnStolen())     { setPlayerEnabled(true); processingTurn = false; return; }
+
+                turnManager.advanceTurn(); refreshCdRow(); updateTurnState();
+                new Timer(ENEMY_TURN_DELAY, et -> doEnemyTurn()) {{ setRepeats(false); start(); }};
+            });
+            recoveryTimer.setRepeats(false); recoveryTimer.start();
+        });
+        impactTimer.setRepeats(false); impactTimer.start();
+    }
+
+    private void executeSummonAssist(int si) {
+        processingTurn = true;
+        setPlayerEnabled(false);
+        summonCharges--;
+        rebuildSkillSlots();
+
+        isSummoning = true;
+
+        if (assistAnimator != null) {
+            assistAnimator.toIdle();
+            log("✨ " + playerCharacter.getName() + " summons " + assistCharacter.getName() + "!");
+
+            Timer entrance = new Timer(400, ev -> {
+                ((Timer)ev.getSource()).stop();
+                assistAnimator.toSkill(0); // Mapped as index 0 in the assist wrapper
+
+                int durationMs = assistDurations[0];
+                int impactDelay = (int)(durationMs * 0.65);
+
+                Timer impactTimer = new Timer(impactDelay, e -> {
+                    ((Timer)e.getSource()).stop();
+                    TurnResult res = turnManager.executeSkill(playerCharacter, enemyCharacter, si);
+                    flushResult(res);
+
+                    enemyFlashAlpha = 1.0f;
+                    if (enemyAnimator != null) enemyAnimator.triggerHit();
+                    refreshUI();
+
+                    Timer recoveryTimer = new Timer((durationMs - impactDelay) + 200, rEv -> {
+                        ((Timer)rEv.getSource()).stop();
+
+                        isSummoning = false; // Revert canvas to Player
+                        if (playerAnimator != null) playerAnimator.toIdle();
+                        refreshUI();
+
+                        if (matchTimeLeft > 0 && !timeUpTriggered) matchTimer.start();
+
+                        if (res.isTargetDefeated()) { onPlayerWon(); return; }
+                        if (res.isTurnStolen())     { setPlayerEnabled(true); processingTurn = false; return; }
+
+                        turnManager.advanceTurn(); refreshCdRow(); updateTurnState();
+                        new Timer(ENEMY_TURN_DELAY, et -> doEnemyTurn()){{setRepeats(false);start();}};
+                    });
+                    recoveryTimer.setRepeats(false); recoveryTimer.start();
+                });
+                impactTimer.setRepeats(false); impactTimer.start();
+            });
+            entrance.setRepeats(false); entrance.start();
+        } else {
+            TurnResult res = turnManager.executeSkill(playerCharacter, enemyCharacter, si);
+            flushResult(res);
+            isSummoning = false;
+            turnManager.advanceTurn(); updateTurnState(); processingTurn = false;
+            if (matchTimeLeft > 0 && !timeUpTriggered) matchTimer.start();
+        }
     }
 
     private void doEnemyTurn() {
+        if (timeUpTriggered) return;
+        if (matchTimer != null && matchTimer.isRunning()) matchTimer.stop();
+
         int si = EnemyAI.chooseSkill(enemyCharacter, turnManager.getCooldownManager());
-        TurnResult res = turnManager.executeSkill(enemyCharacter, playerCharacter, si);
-        flushResult(res); refreshUI();
-        if (res.isTargetDefeated()) { onPlayerLost(); return; }
-        if (res.isTurnStolen()) {
-            new Timer(ENEMY_TURN_DELAY, e -> doEnemyTurn()) {{ setRepeats(false); start(); }};
-            return;
-        }
-        turnManager.advanceTurn(); refreshCdRow(); updateTurnState();
-        setPlayerEnabled(true); processingTurn = false;
+        if (enemyAnimator != null) enemyAnimator.toSkill(si);
+
+        int durationMs  = getSkillDuration(enemyCharacter, si);
+        int impactDelay = (int)(durationMs * 0.65);
+
+        Timer impactTimer = new Timer(impactDelay, e -> {
+            ((Timer)e.getSource()).stop();
+            TurnResult res = turnManager.executeSkill(enemyCharacter, playerCharacter, si);
+            flushResult(res);
+
+            playerFlashAlpha = 1.0f;
+            if (playerAnimator != null) playerAnimator.triggerHit();
+            refreshUI();
+
+            Timer recoveryTimer = new Timer((durationMs - impactDelay) + 150, ev -> {
+                ((Timer)ev.getSource()).stop();
+                if (matchTimeLeft > 0 && !timeUpTriggered) matchTimer.start();
+
+                if (res.isTargetDefeated()) { onPlayerLost(); return; }
+                if (res.isTurnStolen()) {
+                    new Timer(ENEMY_TURN_DELAY, et -> doEnemyTurn()) {{ setRepeats(false); start(); }};
+                    return;
+                }
+                turnManager.advanceTurn(); refreshCdRow(); updateTurnState();
+                setPlayerEnabled(true); processingTurn = false;
+            });
+            recoveryTimer.setRepeats(false); recoveryTimer.start();
+        });
+        impactTimer.setRepeats(false); impactTimer.start();
+    }
+
+    private int getSkillDuration(Character ch, int si) {
+        int[] durations = ch.getSkillAnimationDurations();
+        if (durations != null && si >= 0 && si < durations.length) return durations[si];
+        return 1400;
     }
 
     private void updateTurnState() {
+        if (timeUpTriggered) return;
         boolean myTurn = turnManager.isPlayerTurn();
         setPlayerEnabled(myTurn);
         if (battleCanvas != null) battleCanvas.setPlayerActive(myTurn);
@@ -291,31 +444,215 @@ public class ArcadeModeBattleFrame extends JFrame {
     }
 
     // ══════════════════════════════════════════════════════════
-    //  Win / Lose
+    //  Win / Rewards / Visual Overlays
     // ══════════════════════════════════════════════════════════
+
     private void onPlayerWon() {
         stopMatchTimer(); stopTurnTimer();
         setPlayerEnabled(false); processingTurn = false;
+
+        if (playerAnimator != null) playerAnimator.toIdle();
+        if (enemyAnimator != null) enemyAnimator.dispose();
+
         log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log("🏆  " + playerCharacter.getName() + " defeated " + enemyCharacter.getName() + "!");
         arcadeManager.recordVictory();
-        new Timer(1100, e -> { ((Timer)e.getSource()).stop(); SwingUtilities.invokeLater(this::processVictoryOutcome); })
-        {{ setRepeats(false); start(); }};
+
+        new Timer(1100, e -> {
+            ((Timer)e.getSource()).stop();
+            SwingUtilities.invokeLater(this::processVictoryOutcome);
+        }).start();
     }
 
     private void processVictoryOutcome() {
         if (arcadeManager.isFinished()) { dispose(); new ArcadeVictoryFrame(playerCharacter); return; }
-        if (arcadeManager.shouldGiveHPBoost()) {
-            playerCharacter.increaseMaxHP(ArcadeModeManager.HP_BOOST_AMT);
-            log("✨  Reward: +" + ArcadeModeManager.HP_BOOST_AMT + " Max HP!");
-            showInfoOverlay("✨  POWER SURGE",
-                    "+" + ArcadeModeManager.HP_BOOST_AMT + " Max HP granted!\nYou grow stronger with each victory.",
-                    this::transitionToTower);
-        } else if (arcadeManager.shouldGiveUltimate()) {
-            showUltimateDraftOverlay(this::transitionToTower);
+
+        if (arcadeManager.shouldGiveHPBoost() || arcadeManager.shouldGiveUltimate()) {
+            playRewardSequence(() -> {
+                if (arcadeManager.shouldGiveHPBoost()) {
+                    playerCharacter.increaseMaxHP(ArcadeModeManager.HP_BOOST_AMT);
+                    log("✨  Reward: +" + ArcadeModeManager.HP_BOOST_AMT + " Max HP!");
+                    showInfoOverlay("✨  POWER SURGE", "+" + ArcadeModeManager.HP_BOOST_AMT + " Max HP granted!\nYou grow stronger with each victory.", this::transitionToTower);
+                } else {
+                    showUltimateDraftOverlay(this::transitionToTower);
+                }
+            });
         } else {
             transitionToTower();
         }
+    }
+
+    private void playRewardSequence(Runnable onComplete) {
+        JPanel rewardPanel = new JPanel() {
+            float alpha = 0f; float pTick = 0f; Timer t;
+            {
+                setOpaque(false);
+                t = new Timer(16, e -> { alpha = Math.min(1f, alpha + 0.035f); pTick += 0.06f; repaint(); });
+                t.start();
+                new Timer(2800, e -> { t.stop(); overlayLayer.remove(this); overlayLayer.setVisible(false); overlayLayer.repaint(); onComplete.run(); }){{setRepeats(false); start();}};
+            }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D)g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                g2.setColor(new Color(0, 0, 0, (int)(190 * alpha)));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+
+                int cx = getWidth() / 2, cy = getHeight() / 2;
+
+                // Mystical Rising Aura Particles
+                for(int i=0; i<25; i++) {
+                    double phase = pTick + i * 0.4;
+                    int px = cx + (int)(Math.sin(phase * 0.9 + i) * 120);
+                    int py = cy + 150 - (int)((pTick * 35 + i * 25) % 300);
+                    int size = (int)(5 + Math.sin(phase)*3);
+                    g2.setColor(new Color(255, 215, 100, (int)(220 * alpha)));
+                    g2.fillOval(px, py, size, size);
+                }
+
+                if (playerAnimator != null) {
+                    playerAnimator.toIdle();
+                    playerAnimator.draw(g2, cx - 120, cy - 120, 240, 240, this);
+                }
+                g2.dispose();
+            }
+        };
+        rewardPanel.setBounds(0, 0, getWidth(), getHeight());
+        overlayLayer.removeAll();
+        overlayLayer.add(rewardPanel);
+        overlayLayer.setVisible(true);
+    }
+
+    private void showInfoOverlay(String title, String body, Runnable onConfirm) {
+        overlayLayer.removeAll();
+        overlayLayer.setVisible(true);
+
+        JPanel dim = makeDim();
+        dim.setLayout(new GridBagLayout());
+
+        JPanel card = makeCard(420, 240);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createEmptyBorder(28, 36, 28, 36));
+
+        card.add(cardTitle(title));
+        card.add(Box.createVerticalStrut(14));
+        card.add(cardBody(body));
+        card.add(Box.createVerticalStrut(28));
+
+        JButton btn = makeGoldOverlayButton("Continue  →");
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.addActionListener(e -> {
+            overlayLayer.setVisible(false);
+            overlayLayer.removeAll();
+            if (onConfirm != null) onConfirm.run();
+        });
+
+        card.add(btn);
+        dim.add(card);
+        mountOverlay(dim);
+    }
+
+    private void showUltimateDraftOverlay(Runnable onDone) {
+        List<Skill> pool = buildUltimatePool();
+        if (pool.isEmpty()) { onDone.run(); return; }
+
+        overlayLayer.removeAll(); overlayLayer.setVisible(true);
+        JPanel dim = makeDim(); dim.setLayout(new GridBagLayout());
+
+        int cardH = 140 + pool.size() * 54;
+        JPanel card = makeCard(490, cardH);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createEmptyBorder(24, 32, 24, 32));
+
+        JLabel tl = new JLabel("🔥  ULTIMATE SKILL DRAFT", SwingConstants.CENTER);
+        tl.setFont(new Font("Serif",Font.BOLD|Font.ITALIC,22)); tl.setForeground(new Color(0xFF,0xAA,0x30));
+        tl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel sl = new JLabel("Choose an assist summon to aid your climb:", SwingConstants.CENTER);
+        sl.setFont(new Font("Serif",Font.ITALIC,13)); sl.setForeground(LOG_FG);
+        sl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        card.add(tl); card.add(Box.createVerticalStrut(8)); card.add(sl); card.add(Box.createVerticalStrut(16));
+
+        for (Skill skill : pool) {
+            JButton btn = makeSkillPickButton(skill.getName(), skill.getMinDamage()+"–"+skill.getMaxDamage()+" dmg");
+            btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+            btn.addActionListener(e -> {
+                playerCharacter.addSkill(skill);
+                ultimateUnlocked = true;
+                summonCharges = 3;
+
+                // Construct Assist Animator
+                for (Character c : getFullRoster()) {
+                    if (c.getName().equals(playerCharacter.getName())) continue;
+                    for (int k = 0; k < c.getSkills().size(); k++) {
+                        if (c.getSkills().get(k).getName().equals(skill.getName())) {
+                            assistCharacter = c;
+                            String idle = c.getIdleAnimationPath();
+                            String[] skillPaths = c.getSkillAnimationPaths();
+                            int[] durs = c.getSkillAnimationDurations();
+
+                            String sPath = (skillPaths != null && skillPaths.length > k) ? skillPaths[k] : null;
+                            int sDur = (durs != null && durs.length > k) ? durs[k] : 1600;
+
+                            assistDurations[0] = sDur;
+                            assistAnimator = new CharacterAnimator(idle, new String[]{sPath}, assistDurations);
+                            break;
+                        }
+                    }
+                }
+
+                rebuildSkillSlots();
+                log("🔥  Assist Summon bound: " + (assistCharacter != null ? assistCharacter.getName() : "Unknown") + "!");
+                overlayLayer.setVisible(false); overlayLayer.removeAll(); onDone.run();
+            });
+            card.add(btn); card.add(Box.createVerticalStrut(6));
+        }
+        dim.add(card); mountOverlay(dim);
+    }
+
+    private List<Skill> buildUltimatePool() {
+        Character[] globalRoster = getFullRoster();
+        String playerUltimateName = "";
+        if (playerCharacter.getSkills().size() >= 3) playerUltimateName = playerCharacter.getSkills().get(2).getName();
+
+        List<Skill> pool = new ArrayList<>();
+        for (Character c : globalRoster) {
+            if (c.getName().equals(playerCharacter.getName())) continue;
+            if (c.getSkills().size() >= 3) {
+                Skill ultimate = c.getSkills().get(2);
+                if (!ultimate.getName().equals(playerUltimateName)) pool.add(ultimate);
+            }
+        }
+        Collections.shuffle(pool);
+        return pool.subList(0, Math.min(3, pool.size()));
+    }
+
+    private void restoreAssistAnimator() {
+        if (playerCharacter.getSkills().size() < 4) return;
+        Skill drafted = playerCharacter.getSkills().get(3);
+
+        for (Character c : getFullRoster()) {
+            for (int k = 0; k < c.getSkills().size(); k++) {
+                if (c.getSkills().get(k).getName().equals(drafted.getName())) {
+                    assistCharacter = c;
+                    String idle = c.getIdleAnimationPath();
+                    String[] skillPaths = c.getSkillAnimationPaths();
+                    int[] durs = c.getSkillAnimationDurations();
+
+                    String sPath = (skillPaths != null && skillPaths.length > k) ? skillPaths[k] : null;
+                    int sDur = (durs != null && durs.length > k) ? durs[k] : 1600;
+
+                    assistDurations[0] = sDur;
+                    assistAnimator = new CharacterAnimator(idle, new String[]{sPath}, assistDurations);
+                    return;
+                }
+            }
+        }
+    }
+
+    private Character[] getFullRoster() {
+        return new Character[]{ new Tyrone(), new MakelanShere(), new Mary(), new Dirk(), new Flamara(), new Dea(), new Adamus(), new Tera() };
     }
 
     private void transitionToTower() { dispose(); new ArcadeTowerFrame(playerCharacter, arcadeManager); }
@@ -323,9 +660,13 @@ public class ArcadeModeBattleFrame extends JFrame {
     private void onPlayerLost() {
         stopMatchTimer(); stopTurnTimer();
         setPlayerEnabled(false); processingTurn = false;
+
+        if (playerAnimator != null) playerAnimator.dispose();
+        if (enemyAnimator != null) enemyAnimator.toIdle();
+
         log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log("💀  " + enemyCharacter.getName() + " has defeated you!");
-        new Timer(900, e -> { ((Timer)e.getSource()).stop();
+        new Timer(1200, e -> { ((Timer)e.getSource()).stop();
             showInfoOverlay("💀  FALLEN",
                     "You have fallen in battle.\n" + enemyCharacter.getName() + " proved too powerful.\n\nReturning to main menu...",
                     () -> { dispose(); new MainMenuFrame(); }); })
@@ -333,9 +674,10 @@ public class ArcadeModeBattleFrame extends JFrame {
     }
 
     // ══════════════════════════════════════════════════════════
-    //  Turn timer
+    //  Timers & General Methods
     // ══════════════════════════════════════════════════════════
     private void startTurnTimer() {
+        if (timeUpTriggered) return;
         stopTurnTimer(); timeLeft = 10;
         turnCountdownTimer = new javax.swing.Timer(1000, e -> {
             timeLeft--;
@@ -352,16 +694,18 @@ public class ArcadeModeBattleFrame extends JFrame {
     }
 
     private void onTurnTimerExpired() {
-        if (processingTurn) return;
+        if (processingTurn || timeUpTriggered) return;
         processingTurn = true; setPlayerEnabled(false);
         log("⏰  Time's up!  " + playerCharacter.getName() + "'s turn forfeited.");
         turnManager.advanceTurn(); refreshCdRow(); updateTurnState();
-        new Timer(ENEMY_TURN_DELAY, e -> doEnemyTurn()) {{ setRepeats(false); start(); }};
+
+        Timer aiTrigger = new Timer(500, e -> {
+            ((Timer)e.getSource()).stop();
+            doEnemyTurn();
+        });
+        aiTrigger.setRepeats(false); aiTrigger.start();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Match timer
-    // ══════════════════════════════════════════════════════════
     private void startMatchTimer() {
         stopMatchTimer(); matchTimeLeft = MATCH_DURATION_SECONDS;
         matchTimer = new javax.swing.Timer(1000, e -> {
@@ -370,6 +714,7 @@ public class ArcadeModeBattleFrame extends JFrame {
             if (matchTimeLeft <= 0) { stopMatchTimer(); SwingUtilities.invokeLater(this::onMatchTimerExpired); }
         });
         matchTimer.start();
+        glowAnimTimer.start();
     }
 
     private void stopMatchTimer() {
@@ -379,78 +724,74 @@ public class ArcadeModeBattleFrame extends JFrame {
     }
 
     private void onMatchTimerExpired() {
-        stopTurnTimer(); setPlayerEnabled(false); processingTurn = false;
+        timeUpTriggered = true;
+        stopTurnTimer(); stopMatchTimer();
+        setPlayerEnabled(false); processingTurn = true;
         log("⏱  TIME OVER!");
-        if (playerCharacter.getCurrentHP() > enemyCharacter.getCurrentHP()) {
-            log("🏆  " + playerCharacter.getName() + " wins by HP advantage!"); onPlayerWon();
-        } else {
-            log("💀  " + enemyCharacter.getName() + " wins by HP advantage!"); onPlayerLost();
-        }
+
+        if (battleCanvas != null) battleCanvas.repaint();
+
+        // Pause to show "TIME UP" overlay
+        Timer judgeTimer = new Timer(2000, e -> {
+            ((Timer)e.getSource()).stop();
+            double pPct = (double)playerCharacter.getCurrentHP() / playerCharacter.getMaxHP();
+            double ePct = (double)enemyCharacter.getCurrentHP() / enemyCharacter.getMaxHP();
+
+            if (pPct > ePct) { log("🏆  " + playerCharacter.getName() + " wins by HP advantage!"); onPlayerWon(); }
+            else if (ePct > pPct) { log("💀  " + enemyCharacter.getName() + " wins by HP advantage!"); onPlayerLost(); }
+            else { log("⚖  Draw — " + enemyCharacter.getName() + " claims the round."); onPlayerLost(); }
+        });
+        judgeTimer.setRepeats(false); judgeTimer.start();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Overlays
-    // ══════════════════════════════════════════════════════════
-    private void showInfoOverlay(String title, String body, Runnable onConfirm) {
-        overlayLayer.removeAll(); overlayLayer.setVisible(true);
-        JPanel dim = makeDim(); dim.setLayout(new GridBagLayout());
-        JPanel card = makeCard(420, 220);
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBorder(BorderFactory.createEmptyBorder(28, 36, 28, 36));
-        JButton btn = makeGoldOverlayButton("Continue  →");
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.addActionListener(e -> { overlayLayer.setVisible(false); overlayLayer.removeAll(); if (onConfirm != null) onConfirm.run(); });
-        card.add(cardTitle(title)); card.add(Box.createVerticalStrut(14));
-        card.add(cardBody(body));   card.add(Box.createVerticalStrut(22)); card.add(btn);
-        dim.add(card); mountOverlay(dim);
-    }
+    private void refreshUI() { if (battleCanvas != null) battleCanvas.repaint(); }
 
-    private void showUltimateDraftOverlay(Runnable onDone) {
-        List<Skill> pool = buildUltimatePool();
-        if (pool.isEmpty()) { onDone.run(); return; }
-        overlayLayer.removeAll(); overlayLayer.setVisible(true);
-        JPanel dim = makeDim(); dim.setLayout(new GridBagLayout());
-        int cardH = 140 + pool.size() * 54;
-        JPanel card = makeCard(490, cardH);
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBorder(BorderFactory.createEmptyBorder(24, 32, 24, 32));
-        JLabel tl = new JLabel("🔥  ULTIMATE SKILL DRAFT", SwingConstants.CENTER);
-        tl.setFont(new Font("Serif",Font.BOLD|Font.ITALIC,22)); tl.setForeground(new Color(0xFF,0xAA,0x30));
-        tl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JLabel sl = new JLabel("Choose one ultimate ability — choose wisely:", SwingConstants.CENTER);
-        sl.setFont(new Font("Serif",Font.ITALIC,13)); sl.setForeground(LOG_FG);
-        sl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        card.add(tl); card.add(Box.createVerticalStrut(8)); card.add(sl); card.add(Box.createVerticalStrut(16));
-        for (Skill skill : pool) {
-            JButton btn = makeSkillPickButton(skill.getName(), skill.getMinDamage()+"–"+skill.getMaxDamage()+" dmg  |  CD: "+skill.getCooldown());
-            btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-            btn.addActionListener(e -> {
-                playerCharacter.addSkill(skill); ultimateUnlocked = true;
-                rebuildSkillSlots(); log("🔥  Ultimate unlocked: "+skill.getName()+"!");
-                overlayLayer.setVisible(false); overlayLayer.removeAll(); onDone.run();
-            });
-            card.add(btn); card.add(Box.createVerticalStrut(6));
-        }
-        dim.add(card); mountOverlay(dim);
-    }
+    private void refreshCdRow() {
+        if (turnManager == null) return;
+        List<Skill> skills = playerCharacter.getSkills();
+        for (int i = 0; i < skillBtns.length; i++) {
+            if (skillBtns[i] == null || i >= skills.size()) continue;
 
-    private List<Skill> buildUltimatePool() {
-        Character[] globalRoster = { new Tyrone(), new MakelanShere(), new Mary(), new Dirk(),
-                new Flamara(), new Dea(), new Adamus(), new Tera() };
-        String playerUltimateName = "";
-        List<Skill> mySkills = playerCharacter.getSkills();
-        if (mySkills.size() >= 3) playerUltimateName = mySkills.get(2).getName();
-        List<Skill> pool = new ArrayList<>();
-        for (Character c : globalRoster) {
-            if (c.getName().equals(playerCharacter.getName())) continue;
-            List<Skill> skills = c.getSkills();
-            if (skills.size() >= 3) {
-                Skill ultimate = skills.get(2);
-                if (!ultimate.getName().equals(playerUltimateName)) pool.add(ultimate);
+            if (i == 3) {
+                if (summonCharges <= 0) {
+                    cdLabels[i].setText("EXHAUSTED"); cdLabels[i].setForeground(RED_CRIT); skillBtns[i].setEnabled(false);
+                } else {
+                    int cd = turnManager.getCooldownManager().getRemainingCooldown(playerCharacter, i);
+                    if (cd > 0) { cdLabels[i].setText(cd + " turn(s)"); cdLabels[i].setForeground(ORANGE_LOW); skillBtns[i].setEnabled(false); }
+                    else        { cdLabels[i].setText("READY"); cdLabels[i].setForeground(new Color(0xFF,0xAA,0x30)); }
+                }
+            } else {
+                int cd = turnManager.getCooldownManager().getRemainingCooldown(playerCharacter, i);
+                if (cd > 0) { cdLabels[i].setText(cd + " turn(s)"); cdLabels[i].setForeground(ORANGE_LOW); skillBtns[i].setEnabled(false); }
+                else        { cdLabels[i].setText("READY"); cdLabels[i].setForeground(GREEN_RDY); }
             }
         }
-        Collections.shuffle(pool);
-        return pool.subList(0, Math.min(3, pool.size()));
+    }
+
+    private void setPlayerEnabled(boolean on) {
+        if (timeUpTriggered) on = false;
+        List<Skill> skills = playerCharacter.getSkills();
+        for (int i = 0; i < skillBtns.length; i++) {
+            if (skillBtns[i] != null) {
+                if (i == 3) skillBtns[i].setEnabled(on && ultimateUnlocked && summonCharges > 0);
+                else        skillBtns[i].setEnabled(on && i < skills.size());
+            }
+        }
+        if (on) refreshCdRow();
+    }
+
+    private void flushResult(TurnResult r) { for (String m : r.getLogMessages()) log(m); }
+    private void log(String msg) { SwingUtilities.invokeLater(() -> { if (battleLog != null) { battleLog.append(msg + "\n"); battleLog.setCaretPosition(battleLog.getDocument().getLength()); } }); }
+    private String getFrameImg(String name) { for (int i = 0; i < CHAR_NAMES.length; i++) if (CHAR_NAMES[i].equals(name)) return FRAME_IMGS[i]; return null; }
+
+    protected void drawImageFill(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return; int iw = img.getWidth(null), ih = img.getHeight(null); if (iw <= 0 || ih <= 0) return;
+        double scale = Math.max((double) w / iw, (double) h / ih); int dw = (int) (iw * scale), dh = (int) (ih * scale); g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
+    }
+
+    protected void drawImageProportional(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return; int iw = img.getWidth(null), ih = img.getHeight(null); if (iw <= 0 || ih <= 0) return;
+        double scale = Math.min((double) w / iw, (double) h / ih); int dw = (int) (iw * scale), dh = (int) (ih * scale); g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
     }
 
     private void registerHotkeys() {
@@ -461,89 +802,30 @@ public class ArcadeModeBattleFrame extends JFrame {
         for (int[] kb : coreKeys) {
             int kc=kb[0]; int si=kb[1]; String id="arc_skill_"+si;
             im.put(KeyStroke.getKeyStroke(kc,0,false),id);
-            am.put(id,new AbstractAction(){@Override public void actionPerformed(java.awt.event.ActionEvent e){if(si<skillBtns.length&&skillBtns[si]!=null&&skillBtns[si].isEnabled())onPlayerSkill(si);}});
+            am.put(id,new AbstractAction(){@Override public void actionPerformed(ActionEvent e){if(si<skillBtns.length&&skillBtns[si]!=null&&skillBtns[si].isEnabled())onPlayerSkill(si);}});
         }
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F,0,false),"arc_skill_3");
-        am.put("arc_skill_3",new AbstractAction(){@Override public void actionPerformed(java.awt.event.ActionEvent e){if(!ultimateUnlocked)return;if(skillBtns[3]!=null&&skillBtns[3].isEnabled())onPlayerSkill(3);}});
-    }
-
-    // ── Overlay helpers ───────────────────────────────────────
-    private JPanel makeDim() {
-        JPanel dim=new JPanel(){@Override protected void paintComponent(Graphics g){super.paintComponent(g);Graphics2D g2=(Graphics2D)g.create();g2.setColor(new Color(0,0,0,180));g2.fillRect(0,0,getWidth(),getHeight());g2.dispose();}};
-        dim.setOpaque(false); return dim;
-    }
-    private JPanel makeCard(int w,int h){
-        JPanel card=new JPanel(){@Override protected void paintComponent(Graphics g){Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);g2.setColor(new Color(0x0E,0x09,0x04,248));g2.fillRoundRect(0,0,getWidth(),getHeight(),20,20);g2.setStroke(new BasicStroke(2f));g2.setColor(GOLD);g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2,20,20);g2.dispose();super.paintComponent(g);}};
-        card.setOpaque(false);card.setPreferredSize(new Dimension(w,h));card.setMaximumSize(new Dimension(w,h));return card;
-    }
-    private JLabel cardTitle(String text){JLabel l=new JLabel(text,SwingConstants.CENTER);l.setFont(new Font("Serif",Font.BOLD|Font.ITALIC,22));l.setForeground(GOLD);l.setAlignmentX(Component.CENTER_ALIGNMENT);return l;}
-    private JLabel cardBody(String text){String html="<html><div style='text-align:center;color:#D4C5A0;font-size:13px;font-family:serif'>"+text.replace("\n","<br>")+"</div></html>";JLabel l=new JLabel(html,SwingConstants.CENTER);l.setAlignmentX(Component.CENTER_ALIGNMENT);return l;}
-    private void mountOverlay(JPanel dim){
-        overlayLayer.add(dim); dim.setBounds(0,0,getWidth(),getHeight());
-        overlayLayer.addComponentListener(new ComponentAdapter(){@Override public void componentResized(ComponentEvent e){dim.setBounds(0,0,overlayLayer.getWidth(),overlayLayer.getHeight());}});
-        overlayLayer.revalidate(); overlayLayer.repaint();
-    }
-
-    // ── UI helpers ────────────────────────────────────────────
-    private void refreshUI() { if (battleCanvas != null) battleCanvas.repaint(); }
-
-    private void refreshCdRow() {
-        if (turnManager == null) return;
-        List<Skill> skills = playerCharacter.getSkills();
-        for (int i = 0; i < skillBtns.length; i++) {
-            if (skillBtns[i] == null || i >= skills.size()) continue;
-            int cd = turnManager.getCooldownManager().getRemainingCooldown(playerCharacter, i);
-            if (cd > 0) { cdLabels[i].setText(cd + " turn(s)"); cdLabels[i].setForeground(ORANGE_LOW); skillBtns[i].setEnabled(false); }
-            else        { cdLabels[i].setText("READY"); cdLabels[i].setForeground(GREEN_RDY); }
-        }
-    }
-
-    private void setPlayerEnabled(boolean on) {
-        List<Skill> skills = playerCharacter.getSkills();
-        for (int i = 0; i < skillBtns.length; i++)
-            if (skillBtns[i] != null) skillBtns[i].setEnabled(on && i < skills.size());
-        if (on) refreshCdRow();
-    }
-
-    private void flushResult(TurnResult r) { for (String m : r.getLogMessages()) log(m); }
-
-    private void log(String msg) {
-        SwingUtilities.invokeLater(() -> {
-            if (battleLog != null) { battleLog.append(msg + "\n"); battleLog.setCaretPosition(battleLog.getDocument().getLength()); }
-        });
-    }
-
-    private String getFrameImg(String name) {
-        for (int i = 0; i < CHAR_NAMES.length; i++) if (CHAR_NAMES[i].equals(name)) return FRAME_IMGS[i];
-        return null;
+        am.put("arc_skill_3",new AbstractAction(){@Override public void actionPerformed(ActionEvent e){if(!ultimateUnlocked)return;if(skillBtns[3]!=null&&skillBtns[3].isEnabled())onPlayerSkill(3);}});
     }
 
     // ══════════════════════════════════════════════════════════
-    //  BattleCanvas
+    //  BattleCanvas - Rendering Core
     // ══════════════════════════════════════════════════════════
     private class BattleCanvas extends JPanel {
-        private final Image playerFrame, enemyFrame;
+        private final Image p1Frame, p2Frame;
         private final boolean isBoss;
         private final int idx, total;
-        private boolean playerActive = true;
-        private float   glowTick    = 0f;
-        private final Timer glowTimer;
-
-        // ── Computed HUD geometry (refreshed each paint) ──────
-        // Stacked timer block occupies the top of the canvas.
-        // All other elements are anchored below it.
-        private static final int HUD_TOP_PAD_PX = 6; // base pixels before scaling
+        private boolean p1Active = true;
+        private int hudBottomY = 0;
 
         BattleCanvas(boolean isBoss, int idx, int total) {
             setOpaque(false);
             this.isBoss = isBoss; this.idx = idx; this.total = total;
-            playerFrame = loadImage(getFrameImg(playerCharacter.getName()));
-            enemyFrame  = loadImage(getFrameImg(enemyCharacter.getName()));
-            glowTimer = new Timer(20, e -> { glowTick += 0.08f; repaint(); });
-            glowTimer.start();
+            p1Frame = loadImage(getFrameImg(playerCharacter.getName()));
+            p2Frame = loadImage(getFrameImg(enemyCharacter.getName()));
         }
 
-        void setPlayerActive(boolean v) { playerActive = v; }
+        void setPlayerActive(boolean v) { p1Active = v; }
 
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -554,30 +836,40 @@ public class ArcadeModeBattleFrame extends JFrame {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,     RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-            // ── 1. Central HUD: stacked match + turn timers ───
-            int hudBottom = drawCentralTimerHUD(g2, W, sc);
-
-            // ── 2. Enemy/battle counter pill ─────────────────
+            // ── 1. Arcade Center Pill ──
             String ctTxt = isBoss ? "⚡  FINAL BOSS  ⚡" : "Enemy  " + idx + "  of  " + total;
             Color  ctClr = isBoss ? BOSS_CLR : GOLD;
             g2.setFont(new Font("Serif", Font.BOLD|Font.ITALIC, Math.max(14,(int)(18*sc))));
             FontMetrics fm = g2.getFontMetrics();
-            int ctw=fm.stringWidth(ctTxt)+24, cth=fm.getHeight()+10;
-            int ctx=(W-ctw)/2, cty = hudBottom + (int)(4*sc);
-            g2.setColor(new Color(0x08,0x04,0x02,200)); g2.fillRoundRect(ctx,cty,ctw,cth,cth,cth);
+
+            int tabW = fm.stringWidth(ctTxt) + (int)(48*sc);
+            int tabH = fm.getHeight() + (int)(16*sc);
+            int tabX = (W - tabW) / 2;
+            int tabY = (int)(6*sc);
+
+            g2.setColor(new Color(0x08,0x04,0x02,200));
+            g2.fillRoundRect(tabX, tabY, tabW, tabH, tabH, tabH);
             g2.setColor(new Color(ctClr.getRed(),ctClr.getGreen(),ctClr.getBlue(),120));
-            g2.setStroke(new BasicStroke(1.5f)); g2.drawRoundRect(ctx,cty,ctw,cth,cth,cth);
-            drawShadow(g2,ctTxt,ctx+12,cty+fm.getAscent()+4,ctClr);
+            g2.setStroke(new BasicStroke(1.5f));
+            g2.drawRoundRect(tabX, tabY, tabW, tabH, tabH, tabH);
 
-            // ── 3. Portraits & HP bars ────────────────────────
+            int textX = tabX + (tabW - fm.stringWidth(ctTxt))/2;
+            int textY = tabY + fm.getAscent() + (int)(6*sc);
+            drawShadow(g2, ctTxt, textX, textY, ctClr);
+
+            hudBottomY = tabY + tabH;
+
+            // ── 2. Flanking Timers ──
+            drawFlankingTimers(g2, W, tabX, tabY, tabW, tabH, sc);
+
+            // ── 3. Portraits & HUD ──
             int portW=(int)(82*sc),portH=(int)(82*sc),hpW=(int)(230*sc),hpH=(int)(16*sc);
-            int pillW=(int)(140*sc),pillH=(int)(24*sc);
-            int portY = cty + cth + (int)(8*sc);
+            int pillW=(int)(140*sc),pillH=(int)(24*sc),portY = hudBottomY + (int)(8*sc);
 
-            // Player
-            int ppx=(int)(10*sc);
-            drawPortrait(g2,playerFrame,ppx,portY,portW,portH,PLAYER_CLR,playerActive);
-            int phx=ppx+portW+(int)(8*sc),phy=portY+(int)(8*sc);
+            // P1
+            int p1x=(int)(10*sc);
+            drawPortrait(g2,p1Frame,p1x,portY,portW,portH,PLAYER_CLR,p1Active);
+            int phx=p1x+portW+(int)(8*sc),phy=portY+(int)(8*sc);
             drawHPBar(g2,phx,phy,hpW,hpH,playerCharacter,PLAYER_CLR);
             g2.setFont(new Font("SansSerif",Font.PLAIN,Math.max(8,(int)(10*sc))));
             drawShadow(g2,"HP: "+playerCharacter.getCurrentHP()+" / "+playerCharacter.getMaxHP(),phx,phy+hpH+(int)(10*sc),new Color(0xFF,0xF5,0xDC,190));
@@ -585,10 +877,10 @@ public class ArcadeModeBattleFrame extends JFrame {
             g2.setFont(new Font("SansSerif",Font.BOLD,Math.max(9,(int)(11*sc))));
             drawShadow(g2,"PLAYER",phx,phy-(int)(3*sc),new Color(0xEE,0xEE,0xEE));
 
-            // Enemy
+            // P2
             Color ec=isBoss?BOSS_CLR:ENEMY_CLR;
             int epx=W-(int)(10*sc)-portW;
-            drawPortrait(g2,enemyFrame,epx,portY,portW,portH,ec,!playerActive);
+            drawPortrait(g2,p2Frame,epx,portY,portW,portH,ec,!p1Active);
             int ehx=epx-hpW-(int)(8*sc),ehy=portY+(int)(8*sc);
             drawHPBar(g2,ehx,ehy,hpW,hpH,enemyCharacter,ec);
             g2.setFont(new Font("SansSerif",Font.PLAIN,Math.max(8,(int)(10*sc))));
@@ -599,134 +891,176 @@ public class ArcadeModeBattleFrame extends JFrame {
             g2.setFont(new Font("SansSerif",Font.BOLD,Math.max(9,(int)(11*sc))));
             drawShadow(g2,isBoss?"⚡ BOSS":"ENEMY",ehx,ehy-(int)(3*sc),new Color(0xEE,0xEE,0xEE));
 
-            // ── 4. Turn indicator ─────────────────────────────
-            String tt=playerActive?"▶ Your Turn":"⏳ "+enemyCharacter.getName()+" is acting...";
+            String tt=p1Active?"▶ Your Turn":"⏳ "+enemyCharacter.getName()+" is acting...";
             g2.setFont(new Font("Serif",Font.BOLD|Font.ITALIC,Math.max(10,(int)(13*sc))));
             fm=g2.getFontMetrics();
-            drawShadow(g2,tt,(W-fm.stringWidth(tt))/2,cty+cth+(int)(2*sc),GOLD);
+            drawShadow(g2,tt,(W-fm.stringWidth(tt))/2,hudBottomY+(int)(4*sc),GOLD);
+
+            // ── ACTIVE SPRITE ZONE ──
+            int groundY    = H - (int)(170 * sc);
+            int spriteSize = (int)(220 * sc);
+
+            // Apply Kinetic Knockback Offset
+            int p1SpriteX = (int)(W * 0.15) - (playerAnimator != null ? playerAnimator.getKnockbackOffset() : 0);
+            int p2SpriteX = (int)(W * 0.85) - spriteSize + (enemyAnimator != null ? enemyAnimator.getKnockbackOffset() : 0);
+
+            // Player 1 Sprite
+            if (isSummoning && assistAnimator != null) {
+                Shape savedClip = g2.getClip();
+                assistAnimator.draw(g2, p1SpriteX, groundY - spriteSize, spriteSize, spriteSize, this);
+                g2.setClip(savedClip);
+            } else if (playerAnimator != null) {
+                Shape savedClip = g2.getClip();
+                playerAnimator.draw(g2, p1SpriteX, groundY - spriteSize, spriteSize, spriteSize, this);
+                g2.setClip(savedClip);
+            }
+
+            if (playerFlashAlpha > 0) {
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, playerFlashAlpha * 0.8f));
+                g2.setColor(new Color(255, 0, 0));
+                g2.fillOval(p1SpriteX - spriteSize/4, groundY - spriteSize + spriteSize/4, (int)(spriteSize*1.5), spriteSize);
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+            }
+
+            // Player 2 Sprite [MIRRORED]
+            int eSize = isBoss ? (int)(spriteSize * 1.45) : spriteSize;
+            int eX    = (int)(W * 0.85) - eSize + (enemyAnimator != null ? enemyAnimator.getKnockbackOffset() : 0);
+            int eY    = groundY - eSize;
+
+            if (isBoss) drawBossAura(g2, eX + eSize/2, eY + eSize/2, eSize);
+
+            if (enemyAnimator != null) {
+                AffineTransform oldTransform = g2.getTransform();
+                int cx = eX + eSize / 2;
+                g2.translate(cx, 0); g2.scale(-1, 1); g2.translate(-cx, 0);
+                enemyAnimator.draw(g2, eX, eY, eSize, eSize, this);
+                g2.setTransform(oldTransform);
+            }
+
+            if (enemyFlashAlpha > 0) {
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, enemyFlashAlpha * 0.8f));
+                g2.setColor(new Color(255, 0, 0));
+                g2.fillOval(eX - eSize/4, eY + eSize/4, (int)(eSize*1.5), eSize);
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+            }
+
+            // TIME UP Overlay
+            if (timeUpTriggered) {
+                g2.setColor(new Color(0, 0, 0, 150));
+                g2.fillRect(0, 0, W, H);
+                g2.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, Math.max(50, (int)(70*sc))));
+                FontMetrics tfm = g2.getFontMetrics();
+                String tMsg = "TIME UP";
+                int tx = (W - tfm.stringWidth(tMsg)) / 2;
+                int ty = H / 2;
+                g2.setColor(new Color(0, 0, 0, 200)); g2.drawString(tMsg, tx + 4, ty + 4);
+                g2.setColor(GOLD); g2.drawString(tMsg, tx, ty);
+            }
 
             g2.dispose();
         }
 
-        // ── NEW: Stacked top-center HUD (match + turn) ────────
-        /**
-         * Draws match timer (digital MM:SS) at top-center, then the active-turn
-         * countdown badge directly below it.  Returns the bottom Y so callers
-         * can anchor subsequent elements beneath the HUD block.
-         */
-        private int drawCentralTimerHUD(Graphics2D g2, int W, double sc) {
-            // ── Match timer ───────────────────────────────────
-            int matchFontSz = Math.max(16, (int)(22 * sc));
+        private void drawBossAura(Graphics2D g2, int cx, int cy, int size) {
+            float pulse = (float)(0.8 + 0.2 * Math.sin(glowTick * 2.0));
+            int auraSize = (int)(size * 1.4 * pulse);
+            RadialGradientPaint rgp = new RadialGradientPaint(
+                    new Point(cx, cy), auraSize / 2f,
+                    new float[]{0f, 0.4f, 1f},
+                    new Color[]{ new Color(150, 0, 255, 120), new Color(80, 0, 150, 60), new Color(0, 0, 0, 0) }
+            );
+            g2.setPaint(rgp);
+            g2.fillOval(cx - auraSize/2, cy - auraSize/2, auraSize, auraSize);
+        }
+
+        private void drawFlankingTimers(Graphics2D g2, int W, int tabX, int tabY, int tabW, int tabH, double sc) {
+            int padH = (int)(12 * sc), padV = (int)(5 * sc);
+
+            // Match Timer
+            int matchFontSz = Math.max(14, (int)(19 * sc));
             g2.setFont(new Font("Monospaced", Font.BOLD, matchFontSz));
             FontMetrics mfm = g2.getFontMetrics();
+            int mins = matchTimeLeft / 60, secs = matchTimeLeft % 60;
+            String mTxt = String.format("%02d:%02d", mins, secs);
+            Color matchColor = matchTimeLeft > 40 ? GOLD : matchTimeLeft > 15 ? ORANGE_LOW : RED_CRIT;
 
-            int mins = matchTimeLeft / 60;
-            int secs = matchTimeLeft % 60;
-            String matchTxt = String.format("%02d:%02d", mins, secs);
+            int mW = mfm.stringWidth(mTxt) + padH * 2, mH = mfm.getHeight() + padV * 2;
+            int mX = Math.max((int)(6*sc), tabX - mW - (int)(8*sc));
+            int mY = tabY + (tabH - mH) / 2;
+            if (mX < (int)(4*sc)) mX = (int)(4*sc);
 
-            Color matchColor = matchTimeLeft > 40 ? GOLD
-                    : matchTimeLeft > 15 ? ORANGE_LOW
-                    : RED_CRIT;
-
-            int mPadH = (int)(16 * sc), mPadV = (int)(5 * sc);
-            int mW = mfm.stringWidth(matchTxt) + mPadH * 2;
-            int mH = mfm.getHeight() + mPadV * 2;
-            int mX = (W - mW) / 2;
-            int mY = (int)(HUD_TOP_PAD_PX * sc);
-
-            // Background
-            g2.setColor(new Color(0x06, 0x03, 0x01, 225));
-            g2.fillRoundRect(mX, mY, mW, mH, 12, 12);
-            // Animated glow border
-            float mAlpha = matchTimeLeft <= 15
-                    ? 130 + 125 * (float) Math.abs(Math.sin(glowTick * 2.5f))
-                    : 180;
+            g2.setColor(new Color(0x06, 0x03, 0x01, 225)); g2.fillRoundRect(mX, mY, mW, mH, 12, 12);
+            float mAlpha = matchTimeLeft <= 15 ? 130 + 125*(float)Math.abs(Math.sin(glowTick*2.5f)) : 185;
             g2.setStroke(new BasicStroke(2f));
-            g2.setColor(new Color(matchColor.getRed(), matchColor.getGreen(), matchColor.getBlue(),
-                    Math.min(255, (int) mAlpha)));
+            g2.setColor(new Color(matchColor.getRed(), matchColor.getGreen(), matchColor.getBlue(), Math.min(255,(int)mAlpha)));
             g2.drawRoundRect(mX, mY, mW, mH, 12, 12);
-            // Inner subtle highlight
-            g2.setStroke(new BasicStroke(1f));
-            g2.setColor(new Color(255, 255, 255, 18));
-            g2.drawRoundRect(mX + 2, mY + 2, mW - 4, mH - 4, 10, 10);
-            // Text
-            int mTX = mX + (mW - mfm.stringWidth(matchTxt)) / 2;
-            int mTY = mY + mPadV + mfm.getAscent();
-            g2.setColor(new Color(0, 0, 0, 150));
-            g2.drawString(matchTxt, mTX + 1, mTY + 1);
-            g2.setColor(matchColor);
-            g2.drawString(matchTxt, mTX, mTY);
+            g2.setStroke(new BasicStroke(1f)); g2.setColor(new Color(255,255,255,16)); g2.drawRoundRect(mX+2, mY+2, mW-4, mH-4, 10, 10);
+            int mTX = mX + (mW - mfm.stringWidth(mTxt)) / 2, mTY = mY + padV + mfm.getAscent();
+            g2.setColor(new Color(0,0,0,150)); g2.drawString(mTxt, mTX+1, mTY+1);
+            g2.setColor(matchColor); g2.drawString(mTxt, mTX, mTY);
 
-            int hudBottomY = mY + mH;
-
-            // ── Turn timer (only while countdown is running) ──
+            // Turn Timer
             if (turnCountdownTimer != null && turnCountdownTimer.isRunning()) {
-                int turnFontSz = Math.max(11, (int)(14 * sc));
+                int turnFontSz = Math.max(13, (int)(17 * sc));
                 g2.setFont(new Font("Serif", Font.BOLD, turnFontSz));
                 FontMetrics tfm = g2.getFontMetrics();
+                Color turnColor = timeLeft > 6 ? new Color(0xEE,0xEE,0xEE) : timeLeft > 3 ? ORANGE_LOW : RED_CRIT;
+                String tTxt = "TURN  " + timeLeft;
+                int tW = tfm.stringWidth(tTxt) + padH * 2, tH = tfm.getHeight() + padV * 2;
+                int tX = tabX + tabW + (int)(8*sc);
+                if (tX + tW > W - (int)(4*sc)) tX = W - tW - (int)(4*sc);
+                int tY = tabY + (tabH - tH) / 2;
 
-                Color turnColor = timeLeft > 6 ? new Color(0xEE, 0xEE, 0xEE)
-                        : timeLeft > 3 ? ORANGE_LOW
-                        : RED_CRIT;
-                String turnTxt = "TURN  " + timeLeft;
-
-                int tPadH = (int)(14 * sc), tPadV = (int)(4 * sc);
-                int tW = tfm.stringWidth(turnTxt) + tPadH * 2;
-                int tH = tfm.getHeight() + tPadV * 2;
-                int tX = (W - tW) / 2;
-                int tY = mY + mH + (int)(3 * sc);
-
-                // Background
-                g2.setColor(new Color(0x06, 0x03, 0x01, 215));
-                g2.fillRoundRect(tX, tY, tW, tH, tH, tH);
-                // Pulsing border
-                float tAlpha = timeLeft <= 3
-                        ? 120 + 135 * (float) Math.abs(Math.sin(glowTick * 3))
-                        : 150;
+                g2.setColor(new Color(0x06, 0x03, 0x01, 215)); g2.fillRoundRect(tX, tY, tW, tH, tH, tH);
+                float tAlpha = timeLeft <= 3 ? 120 + 135*(float)Math.abs(Math.sin(glowTick*3)) : 155;
                 g2.setStroke(new BasicStroke(1.5f));
-                g2.setColor(new Color(turnColor.getRed(), turnColor.getGreen(), turnColor.getBlue(),
-                        Math.min(255, (int) tAlpha)));
+                g2.setColor(new Color(turnColor.getRed(), turnColor.getGreen(), turnColor.getBlue(), Math.min(255,(int)tAlpha)));
                 g2.drawRoundRect(tX, tY, tW, tH, tH, tH);
-                // Text
-                int tTX = tX + (tW - tfm.stringWidth(turnTxt)) / 2;
-                int tTY = tY + tPadV + tfm.getAscent();
-                g2.setColor(new Color(0, 0, 0, 130));
-                g2.drawString(turnTxt, tTX + 1, tTY + 1);
-                g2.setColor(turnColor);
-                g2.drawString(turnTxt, tTX, tTY);
-
-                hudBottomY = tY + tH;
+                int tTX = tX + (tW - tfm.stringWidth(tTxt)) / 2, tTY = tY + padV + tfm.getAscent();
+                g2.setColor(new Color(0,0,0,130)); g2.drawString(tTxt, tTX+1, tTY+1);
+                g2.setColor(turnColor); g2.drawString(tTxt, tTX, tTY);
             }
-
-            return hudBottomY + (int)(2 * sc);
         }
 
-        private void drawPortrait(Graphics2D g2,Image img,int x,int y,int w,int h,Color accent,boolean active){
-            if(active){float a=0.22f+0.16f*(float)Math.sin(glowTick);for(int r=5;r>=1;r--){int sp=r*3;g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),Math.min(255,(int)(a*80/r))));g2.setStroke(new BasicStroke(sp));g2.drawRoundRect(x-sp/2,y-sp/2,w+sp,h+sp,10,10);}}
-            g2.setColor(new Color(0x08,0x05,0x02,210));g2.fillRoundRect(x,y,w,h,8,8);
-            if(img!=null)g2.drawImage(img,x,y,w,h,null);
-            g2.setStroke(new BasicStroke(2));g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),active?220:90));g2.drawRoundRect(x,y,w,h,8,8);
+        private void drawPortrait(Graphics2D g2, Image img, int x, int y, int w, int h, Color accent, boolean active) {
+            if (active) {
+                float a = 0.25f + 0.15f * (float)Math.sin(glowTick);
+                for (int r = 5; r >= 1; r--) {
+                    int sp = r*3;
+                    g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),Math.min(255,(int)(a*80/r))));
+                    g2.setStroke(new BasicStroke(sp)); g2.drawRoundRect(x-sp/2,y-sp/2,w+sp,h+sp,10,10);
+                }
+            }
+            g2.setColor(new Color(0x08,0x05,0x02,200)); g2.fillRoundRect(x,y,w,h,8,8);
+            if (img != null) drawImageProportional(g2, img, x, y, w, h);
+            g2.setStroke(new BasicStroke(2));
+            g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),active?220:100));
+            g2.drawRoundRect(x,y,w,h,8,8);
         }
-        private void drawHPBar(Graphics2D g2,int x,int y,int w,int h,Character c,Color base){
-            double pct=Math.max(0,Math.min(1.0,(double)c.getCurrentHP()/c.getMaxHP()));
-            Color bar=pct<=0.25?RED_CRIT:pct<=0.50?ORANGE_LOW:base;
-            g2.setColor(new Color(0x08,0x04,0x02,220));g2.fillRoundRect(x,y,w,h,h,h);
-            int fw=(int)(w*pct);if(fw>2){g2.setPaint(new GradientPaint(x,y,bar.brighter(),x,y+h,bar.darker()));g2.fillRoundRect(x,y,fw,h,h,h);}
-            g2.setStroke(new BasicStroke(1));g2.setColor(new Color(0xFF,0xFF,0xFF,50));g2.drawRoundRect(x,y,w,h,h,h);
+
+        private void drawHPBar(Graphics2D g2, int x, int y, int w, int h, Character c, Color base) {
+            double pct = Math.max(0, Math.min(1.0, (double)c.getCurrentHP() / c.getMaxHP()));
+            Color bar = pct <= 0.25 ? RED_CRIT : pct <= 0.50 ? ORANGE_LOW : base;
+            g2.setColor(new Color(0x08,0x04,0x02,220)); g2.fillRoundRect(x,y,w,h,h,h);
+            int fw = (int)(w*pct);
+            if (fw > 2) { g2.setPaint(new GradientPaint(x,y,bar.brighter(),x,y+h,bar.darker())); g2.fillRoundRect(x,y,fw,h,h,h); }
+            g2.setStroke(new BasicStroke(1)); g2.setColor(new Color(0xFF,0xFF,0xFF,55)); g2.drawRoundRect(x,y,w,h,h,h);
         }
-        private void drawNamePill(Graphics2D g2,String t,int x,int y,int w,int h,Color bg,Color fg){
-            g2.setColor(bg);g2.fillRoundRect(x,y,w,h,h,h);g2.setStroke(new BasicStroke(1));
-            g2.setColor(new Color(fg.getRed(),fg.getGreen(),fg.getBlue(),130));g2.drawRoundRect(x,y,w,h,h,h);
-            g2.setFont(new Font("Serif",Font.BOLD,Math.max(9,h-6)));FontMetrics fm=g2.getFontMetrics();
-            int tx=x+(w-fm.stringWidth(t))/2,ty=y+(h+fm.getAscent()-fm.getDescent())/2;
-            g2.setColor(new Color(0,0,0,100));g2.drawString(t,tx+1,ty+1);g2.setColor(fg);g2.drawString(t,tx,ty);
+
+        private void drawNamePill(Graphics2D g2, String text, int x, int y, int w, int h, Color bg, Color fg) {
+            g2.setColor(bg); g2.fillRoundRect(x,y,w,h,h,h);
+            g2.setStroke(new BasicStroke(1));
+            g2.setColor(new Color(fg.getRed(),fg.getGreen(),fg.getBlue(),130)); g2.drawRoundRect(x,y,w,h,h,h);
+            g2.setFont(new Font("Serif",Font.BOLD,Math.max(9,h-6))); FontMetrics fm = g2.getFontMetrics();
+            int tx = x+(w-fm.stringWidth(text))/2, ty = y+(h+fm.getAscent()-fm.getDescent())/2;
+            g2.setColor(new Color(0,0,0,100)); g2.drawString(text,tx+1,ty+1);
+            g2.setColor(fg); g2.drawString(text,tx,ty);
         }
-        private void drawShadow(Graphics2D g2,String t,int x,int y,Color c){
-            g2.setColor(new Color(0,0,0,150));g2.drawString(t,x+1,y+1);g2.setColor(c);g2.drawString(t,x,y);
+
+        private void drawShadow(Graphics2D g2, String t, int x, int y, Color c) {
+            g2.setColor(new Color(0,0,0,150)); g2.drawString(t,x+1,y+1); g2.setColor(c); g2.drawString(t,x,y);
         }
     }
 
-    // ── Widget factories ──────────────────────────────────────
     private JButton makePillButton(String label, Color bg, Color fg) {
         JButton btn = new JButton(label) {
             @Override protected void paintComponent(Graphics g) {
@@ -794,12 +1128,33 @@ public class ArcadeModeBattleFrame extends JFrame {
         return new ImageIcon(url).getImage();
     }
 
+    private JPanel makeDim() {
+        JPanel dim=new JPanel(){@Override protected void paintComponent(Graphics g){super.paintComponent(g);Graphics2D g2=(Graphics2D)g.create();g2.setColor(new Color(0,0,0,180));g2.fillRect(0,0,getWidth(),getHeight());g2.dispose();}};
+        dim.setOpaque(false); return dim;
+    }
+    private JPanel makeCard(int w,int h){
+        JPanel card=new JPanel(){@Override protected void paintComponent(Graphics g){Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);g2.setColor(new Color(0x0E,0x09,0x04,248));g2.fillRoundRect(0,0,getWidth(),getHeight(),20,20);g2.setStroke(new BasicStroke(2f));g2.setColor(GOLD);g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2,20,20);g2.dispose();super.paintComponent(g);}};
+        card.setOpaque(false);card.setPreferredSize(new Dimension(w,h));card.setMaximumSize(new Dimension(w,h));return card;
+    }
+    private JLabel cardTitle(String text){JLabel l=new JLabel(text,SwingConstants.CENTER);l.setFont(new Font("Serif",Font.BOLD|Font.ITALIC,22));l.setForeground(GOLD);l.setAlignmentX(Component.CENTER_ALIGNMENT);return l;}
+    private JLabel cardBody(String text){String html="<html><div style='text-align:center;color:#D4C5A0;font-size:13px;font-family:serif'>"+text.replace("\n","<br>")+"</div></html>";JLabel l=new JLabel(html,SwingConstants.CENTER);l.setAlignmentX(Component.CENTER_ALIGNMENT);return l;}
+    private void mountOverlay(JPanel dim){
+        overlayLayer.add(dim); dim.setBounds(0,0,getWidth(),getHeight());
+        overlayLayer.addComponentListener(new ComponentAdapter(){@Override public void componentResized(ComponentEvent e){dim.setBounds(0,0,overlayLayer.getWidth(),overlayLayer.getHeight());}});
+        overlayLayer.revalidate(); overlayLayer.repaint();
+    }
+
     private class BgPanel extends JPanel {
         private final Image img;
         BgPanel(String p) { img = loadImage(p); setOpaque(true); setBackground(Color.BLACK); }
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (img != null) { Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);g2.drawImage(img,0,0,getWidth(),getHeight(),null);g2.dispose(); }
+            if (img != null) {
+                Graphics2D g2=(Graphics2D)g.create();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                drawImageFill(g2, img, 0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
         }
     }
 }

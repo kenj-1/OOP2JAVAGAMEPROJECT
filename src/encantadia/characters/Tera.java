@@ -4,6 +4,19 @@ import encantadia.battle.skill.Skill;
 
 public class Tera extends Character {
 
+    // ── Animation resource paths ──────────────────────────────────────────────
+    // TODO: Paste your exact GIF paths inside the quotes
+    private static final String IDLE_PATH = "/resources/character/tera/Tera_Idle.gif";
+
+    private static final String[] SKILL_PATHS = {
+            "/resources/character/tera/Tera_Skill1_RockSmash.gif", // Skill 1: Rock Smash
+            "/resources/character/tera/Tera_Skill2_Earthquake.gif", // Skill 2: Earthquake
+            "/resources/character/tera/Tera_Skill3_NaturesWrath.gif"  // Skill 3: Nature's Wrath
+    };
+
+    // TODO: Adjust these millisecond values to match the exact length of your GIFs
+    private static final int[] SKILL_DURATIONS_MS = { 1400, 1400, 1600 };
+
     public Tera() {
 
         super(
@@ -29,5 +42,21 @@ public class Tera extends Character {
                 Skill.EffectType.HEAL,
                 450,
                 1.0));
+    }
+
+    // ── Animation Overrides ───────────────────────────────────────────────────
+    @Override
+    public String getIdleAnimationPath() {
+        return IDLE_PATH.isEmpty() ? null : IDLE_PATH;
+    }
+
+    @Override
+    public String[] getSkillAnimationPaths() {
+        return SKILL_PATHS.clone();
+    }
+
+    @Override
+    public int[] getSkillAnimationDurations() {
+        return SKILL_DURATIONS_MS.clone();
     }
 }

@@ -4,6 +4,19 @@ import encantadia.battle.skill.Skill;
 
 public class Adamus extends Character {
 
+    // ── Animation resource paths ──────────────────────────────────────────────
+    // TODO: Paste your exact GIF paths inside the quotes
+    private static final String IDLE_PATH = "/resources/character/adamus/Adamus_Idle.gif";
+
+    private static final String[] SKILL_PATHS = {
+            "/resources/character/adamus/Adamus_Skill1_WaterSpear.gif", // Skill 1: Water Spear
+            "/resources/character/adamus/Adamus_Skill2_OceanWave.gif", // Skill 2: Ocean Wave
+            "/resources/character/adamus/Adamus_Skill3_TsunamiCurse.gif"  // Skill 3: Tsunami Curse
+    };
+
+    // TODO: Adjust these millisecond values to match the exact length of your GIFs
+    private static final int[] SKILL_DURATIONS_MS = { 1400, 1400, 1600 };
+
     public Adamus() {
 
         super(
@@ -31,5 +44,21 @@ public class Adamus extends Character {
                 0.45,
                 1.0));
 
+    }
+
+    // ── Animation Overrides ───────────────────────────────────────────────────
+    @Override
+    public String getIdleAnimationPath() {
+        return IDLE_PATH.isEmpty() ? null : IDLE_PATH;
+    }
+
+    @Override
+    public String[] getSkillAnimationPaths() {
+        return SKILL_PATHS.clone();
+    }
+
+    @Override
+    public int[] getSkillAnimationDurations() {
+        return SKILL_DURATIONS_MS.clone();
     }
 }

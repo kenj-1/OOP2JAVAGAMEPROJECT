@@ -4,10 +4,20 @@ import encantadia.battle.skill.Skill;
 
 public class Dea extends Character {
 
+    // ── Animation resource paths ──────────────────────────────────────────────
+    // TODO: Paste your exact GIF paths inside the quotes
+    private static final String IDLE_PATH = "/resources/character/dea/Dea_Idle.gif";
+
+    private static final String[] SKILL_PATHS = {
+            "/resources/character/dea/Dea_Skill1_WindSlash.gif", // Skill 1: Wind Slash
+            "/resources/character/dea/Dea_Skill2_StormFury.gif", // Skill 2: Storm Fury
+            "/resources/character/dea/Dea_SKill3_WhirlWind.gif"  // Skill 3: Whirlwind
+    };
+
+    // TODO: Adjust these millisecond values to match the exact length of your GIFs
+    private static final int[] SKILL_DURATIONS_MS = { 1400, 1400, 1600 };
+
     public Dea() {
-
-
-
 
         super(
                 "Dea",
@@ -32,5 +42,21 @@ public class Dea extends Character {
                 Skill.EffectType.COOLDOWN_INCREASE,
                 1,
                 0.45));
+    }
+
+    // ── Animation Overrides ───────────────────────────────────────────────────
+    @Override
+    public String getIdleAnimationPath() {
+        return IDLE_PATH.isEmpty() ? null : IDLE_PATH;
+    }
+
+    @Override
+    public String[] getSkillAnimationPaths() {
+        return SKILL_PATHS.clone();
+    }
+
+    @Override
+    public int[] getSkillAnimationDurations() {
+        return SKILL_DURATIONS_MS.clone();
     }
 }

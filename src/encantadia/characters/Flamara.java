@@ -4,6 +4,19 @@ import encantadia.battle.skill.Skill;
 
 public class Flamara extends Character {
 
+    // ── Animation resource paths ──────────────────────────────────────────────
+    // TODO: Paste your exact GIF paths inside the quotes
+    private static final String IDLE_PATH = "/resources/character/flamara/Flamara_Idle.gif";
+
+    private static final String[] SKILL_PATHS = {
+            "/resources/character/flamara/Flamara_SKill1_FireBall.gif", // Skill 1: Fire Ball
+            "/resources/character/flamara/Flamara_SKill2_FlameBurst.gif", // Skill 2: Flame Burst
+            "/resources/character/flamara/Flamara_SKill3_InfernoStrike.gif"  // Skill 3: Inferno Strike
+    };
+
+    // TODO: Adjust these millisecond values to match the exact length of your GIFs
+    private static final int[] SKILL_DURATIONS_MS = { 1400, 1400, 1600 };
+
     public Flamara() {
 
         super(
@@ -29,5 +42,21 @@ public class Flamara extends Character {
                 Skill.EffectType.EXTRA_DAMAGE,
                 200,
                 0.40));
+    }
+
+    // ── Animation Overrides ───────────────────────────────────────────────────
+    @Override
+    public String getIdleAnimationPath() {
+        return IDLE_PATH.isEmpty() ? null : IDLE_PATH;
+    }
+
+    @Override
+    public String[] getSkillAnimationPaths() {
+        return SKILL_PATHS.clone();
+    }
+
+    @Override
+    public int[] getSkillAnimationDurations() {
+        return SKILL_DURATIONS_MS.clone();
     }
 }
