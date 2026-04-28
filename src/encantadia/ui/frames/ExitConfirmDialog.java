@@ -10,222 +10,158 @@ import java.net.URL;
 
 public class ExitConfirmDialog extends JFrame {
 
-    private static final String BG_PATH       = "/welcomeScreen_JAVA.png";
-    private static final String HOLDER_PATH   = "/optionsHolder.png";
-    private static final String BANNER_PATH   = "/exitButton (1).png";
-    private static final String QUESTION_PATH = "/exitGame.png";
-    private static final String CANCEL_PATH   = "/cancelButton.png";
-    private static final String EXITGAME_PATH = "/exitButton1.png";
-    private static final String TITLE_PATH    = "/gameTitle.png";
+    // FIXED: Added "/resources/" prefix to all paths
+    private static final String BG_PATH       = "/resources/welcomeScreen_JAVA.png";
+    private static final String HOLDER_PATH   = "/resources/optionsHolder.png";
+    private static final String YES_PATH      = "/resources/exitButton (1).png"; // Replace with your Yes button if different
+    private static final String NO_PATH       = "/resources/cancelButton.png";   // Replace with your No button if different
 
     private ImagePanel holderPanel;
-    private ImagePanel bannerPanel;
-    private ImagePanel questionPanel;
-    private FloatingImagePanel titlePanel;
-    private JButton cancelButton;
-    private JButton exitGameButton;
-    private JPanel btnRow;
+    private JButton    yesButton;
+    private JButton    noButton;
 
+    private Timer animTimer;
     private float time = 0f;
 
     public ExitConfirmDialog() {
-        setTitle("Encantadia — Exit");
+        setTitle("Encantadia — Exit Game?");
         setSize(1024, 768);
+        setMinimumSize(new Dimension(800, 600));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setResizable(true);
 
         JLayeredPane lp = new JLayeredPane();
         lp.setLayout(null);
         setContentPane(lp);
 
-        // Background
-        ImagePanel bg = new ImagePanel(BG_PATH);
+        BgPanel bg = new BgPanel(BG_PATH);
         lp.add(bg, JLayeredPane.DEFAULT_LAYER);
 
-        // Title
-        titlePanel = new FloatingImagePanel(TITLE_PATH);
-        lp.add(titlePanel, JLayeredPane.PALETTE_LAYER);
+        // Add a dark dim overlay to focus attention
+        JPanel dim = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                g.setColor(new Color(0, 0, 0, 160));
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        };
+        dim.setOpaque(false);
+        lp.add(dim, JLayeredPane.PALETTE_LAYER);
 
-        // Holder
         holderPanel = new ImagePanel(HOLDER_PATH);
-        lp.add(holderPanel, JLayeredPane.PALETTE_LAYER);
+        lp.add(holderPanel, JLayeredPane.MODAL_LAYER);
 
-        // Banner
-        bannerPanel = new ImagePanel(BANNER_PATH);
-        lp.add(bannerPanel, JLayeredPane.MODAL_LAYER);
+        yesButton = makeImgButton(YES_PATH, "Yes");
+        noButton  = makeImgButton(NO_PATH, "No");
 
-        // Question
-        questionPanel = new ImagePanel(QUESTION_PATH);
-        lp.add(questionPanel, JLayeredPane.MODAL_LAYER);
+        JPanel btnLayer = new JPanel(null);
+        btnLayer.setOpaque(false);
+        lp.add(btnLayer, JLayeredPane.POPUP_LAYER);
 
-        // Buttons
-        cancelButton   = makeImgButton(CANCEL_PATH);
-        exitGameButton = makeImgButton(EXITGAME_PATH);
+        // Labels
+        JLabel questionLbl = new JLabel("Are you sure you want to leave Encantadia?", SwingConstants.CENTER);
+        questionLbl.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 24));
+        questionLbl.setForeground(new Color(0xC8, 0xA0, 0x28));
+        btnLayer.add(questionLbl);
 
-        btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-        btnRow.setOpaque(false);
-        btnRow.add(cancelButton);
-        btnRow.add(exitGameButton);
-        lp.add(btnRow, JLayeredPane.POPUP_LAYER);
-
-        // Actions
-        cancelButton.addActionListener(e -> {
-            dispose();
-            new WelcomeScreenPage();
-        });
-
-        exitGameButton.addActionListener(e -> System.exit(0));
-
-        // Resize listener
         addComponentListener(new ComponentAdapter() {
             @Override public void componentResized(ComponentEvent e) {
-                reposition(lp, bg);
+                reposition(lp, bg, dim, btnLayer, questionLbl);
             }
         });
 
-        // Animation Timer
-        new Timer(16, e -> {
+        animTimer = new Timer(16, e -> {
             time += 0.016f;
-            repaint();
-        }).start();
+            lp.repaint();
+        });
+        animTimer.start();
 
-        if (ScreenManager.isFullscreen()) {
-            setExtendedState(JFrame.MAXIMIZED_BOTH);
-        }
+        // Actions
+        yesButton.addActionListener(e -> System.exit(0));
+        noButton.addActionListener(e -> { dispose(); new WelcomeScreenPage(); });
 
         setVisible(true);
         ScreenManager.register(this);
-        SwingUtilities.invokeLater(() -> reposition(lp, bg));
+
+        SwingUtilities.invokeLater(() -> reposition(lp, bg, dim, btnLayer, questionLbl));
     }
 
     @Override
     public void dispose() {
+        if (animTimer != null) animTimer.stop();
         ScreenManager.unregister(this);
         super.dispose();
     }
 
-    private void reposition(JLayeredPane pane, ImagePanel bg) {
-        int W = pane.getWidth();
-        int H = pane.getHeight();
+    private void reposition(JLayeredPane pane, BgPanel bg, JPanel dim, JPanel btnLayer, JLabel questionLbl) {
+        int W = pane.getWidth(), H = pane.getHeight();
         if (W == 0 || H == 0) return;
 
         bg.setBounds(0, 0, W, H);
+        dim.setBounds(0, 0, W, H);
 
         double scale = Math.min(W / 1024.0, H / 768.0);
-        scale = Math.min(scale, 1.4);
 
-        // Title position
-        int titleW = (int)(500 * scale);
-        int titleH = (int)(titleW * 0.30);
-        int titleY = (int)(40 * scale);
-        int titleX = (W - titleW) / 2;
-        titlePanel.setBounds(titleX, titleY, titleW, titleH);
-
-        // Holder
+        // HOLDER
         int holderW = (int)(600 * scale);
         int holderH = (int)(holderW / 2.0);
         int holderX = (W - holderW) / 2;
-        int holderY = (H - holderH) / 2 ;
+        int holderY = (H - holderH) / 2;
         holderPanel.setBounds(holderX, holderY, holderW, holderH);
 
-        // Banner
-        int bannerW = (int)(200 * scale);
-        int bannerH = (int)(bannerW / 2.5);
-        int bannerX = holderX + (holderW - bannerW) / 2;
-        int bannerY = holderY - (bannerH / 3);
-        bannerPanel.setBounds(bannerX, bannerY, bannerW, bannerH);
+        // TEXT
+        int lblH = (int)(40 * scale);
+        questionLbl.setBounds(holderX, holderY + (int)(holderH * 0.25), holderW, lblH);
+        questionLbl.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, Math.max(16, (int)(24*scale))));
 
-        // Question
-        int qW = (int)(370 * scale);
-        int qH = (int)(qW / 3.0);
-        int qY = holderY + (int)(holderH * 0.20);
-        int qX = holderX + (holderW - qW) / 2;
-        questionPanel.setBounds(qX, qY, qW, qH);
-
-        // Buttons
+        // BUTTONS
+        int btnW = (int)(180 * scale);
         int btnH = (int)(60 * scale);
-        int cancelW = (int)(btnH * 3.0);
-        int exitGW  = (int)(btnH * 4.5);
+
         int gap = (int)(20 * scale);
+        int totalBtnW = (btnW * 2) + gap;
+        int startX = holderX + (holderW - totalBtnW) / 2;
+        int btnY = holderY + (int)(holderH * 0.60);
 
-        setFull(cancelButton, cancelW, btnH);
-        setFull(exitGameButton, exitGW, btnH);
+        yesButton.setBounds(startX, btnY, btnW, btnH);
+        noButton.setBounds(startX + btnW + gap, btnY, btnW, btnH);
 
-        int rowW = cancelW + exitGW + gap;
-        int rowX = holderX + (holderW - rowW) / 2;
-        int rowY = holderY + (int)(holderH * 0.65);
-
-        btnRow.removeAll();
-        btnRow.add(cancelButton);
-        btnRow.add(Box.createHorizontalStrut(gap));
-        btnRow.add(exitGameButton);
-        btnRow.setBounds(rowX, rowY, rowW, btnH + 4);
-
-        pane.setLayer(titlePanel,   JLayeredPane.PALETTE_LAYER);
-        pane.setLayer(holderPanel,  JLayeredPane.PALETTE_LAYER);
-        pane.setLayer(bannerPanel,  JLayeredPane.MODAL_LAYER);
-        pane.setLayer(questionPanel,JLayeredPane.MODAL_LAYER);
-        pane.setLayer(btnRow,       JLayeredPane.POPUP_LAYER);
+        btnLayer.removeAll();
+        btnLayer.setBounds(0, 0, W, H);
+        btnLayer.add(questionLbl);
+        btnLayer.add(yesButton);
+        btnLayer.add(noButton);
 
         pane.revalidate();
         pane.repaint();
     }
 
-    private static void setFull(JButton b, int w, int h) {
-        Dimension d = new Dimension(w, h);
-        b.setPreferredSize(d);
-        b.setMinimumSize(d);
-        b.setMaximumSize(d);
-    }
-
-    // FLOATING TITLE PANEL
-    private class FloatingImagePanel extends JPanel {
-        private final Image img;
-
-        FloatingImagePanel(String path) {
-            img = loadImage(path);
-            setOpaque(false);
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-
-            if (img != null) {
-                Graphics2D g2 = (Graphics2D) g.create();
-
-                float floatY = (float)Math.sin(time * 1.2) * 10f;
-
-                g2.drawImage(img,
-                        0,
-                        (int)floatY,
-                        getWidth(),
-                        getHeight(),
-                        null);
-
-                g2.dispose();
-            }
-        }
-    }
-
-    private JButton makeImgButton(String path) {
+    private JButton makeImgButton(String path, String fallback) {
         Image img = loadImage(path);
         JButton btn = new JButton() {
             @Override protected void paintComponent(Graphics g) {
-                if (img == null) { super.paintComponent(g); return; }
                 Graphics2D g2 = (Graphics2D) g.create();
-                int iw = img.getWidth(null), ih = img.getHeight(null);
-                double s = Math.min((double)getWidth()/iw, (double)getHeight()/ih);
-                int dw = (int)(iw*s), dh = (int)(ih*s);
-                int x  = (getWidth()-dw)/2, y = (getHeight()-dh)/2;
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+                if (img == null) {
+                    g2.setColor(new Color(0xC8, 0xA0, 0x28));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                    g2.setColor(Color.BLACK);
+                    g2.drawString(fallback, getWidth()/2 - 15, getHeight()/2 + 5);
+                    return;
+                }
+
+                double s = Math.min((double)getWidth()/img.getWidth(null), (double)getHeight()/img.getHeight(null));
+                if (getModel().isRollover()) s *= 1.05;
+
+                int dw = (int)(img.getWidth(null) * s);
+                int dh = (int)(img.getHeight(null) * s);
+                int x = (getWidth() - dw) / 2, y = (getHeight() - dh) / 2;
+
                 g2.drawImage(img, x, y, dw, dh, null);
                 g2.dispose();
             }
         };
-        btn.setContentAreaFilled(false);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
+        btn.setContentAreaFilled(false); btn.setBorderPainted(false); btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
     }
@@ -236,13 +172,46 @@ public class ExitConfirmDialog extends JFrame {
         return new ImageIcon(url).getImage();
     }
 
+    protected void drawImageFill(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return;
+        int iw = img.getWidth(null), ih = img.getHeight(null); if (iw <= 0 || ih <= 0) return;
+        double scale = Math.max((double) w / iw, (double) h / ih);
+        int dw = (int) (iw * scale), dh = (int) (ih * scale);
+        g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
+    }
+
+    protected void drawImageProportional(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return;
+        int iw = img.getWidth(null), ih = img.getHeight(null); if (iw <= 0 || ih <= 0) return;
+        double scale = Math.min((double) w / iw, (double) h / ih);
+        int dw = (int) (iw * scale), dh = (int) (ih * scale);
+        g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
+    }
+
+    private class BgPanel extends JPanel {
+        private final Image img;
+        BgPanel(String p) { img = loadImage(p); setOpaque(true); setBackground(Color.BLACK); }
+        @Override protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (img != null) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                drawImageFill(g2, img, 0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
+        }
+    }
+
     private class ImagePanel extends JPanel {
         private final Image img;
         ImagePanel(String path) { img = loadImage(path); setOpaque(false); }
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             if (img == null) return;
-            g.drawImage(img, 0, 0, getWidth(), getHeight(), null);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            drawImageProportional(g2, img, 0, 0, getWidth(), getHeight());
+            g2.dispose();
         }
     }
 }
