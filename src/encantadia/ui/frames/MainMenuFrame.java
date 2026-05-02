@@ -13,19 +13,9 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.net.URL;
 
-/**
- * MainMenuFrame
- *
- * FIXED: Implements proper UI responsiveness and Aspect-Ratio safe scaling.
- *
- * Changes:
- *   • Completely relative responsive bounding math.
- *   • drawImageFill and drawImageProportional utilities implemented for anti-stretching.
- *   • Trophy dynamically locks into the gap space smoothly without distortion.
- */
 public class MainMenuFrame extends JFrame {
 
-    private JButton arcadeButton, PVPButton, PVEButton, exitGameButton;
+    private JButton arcadeButton, PVPButton, PVEButton, exitGameButton, leaderboardButton;
 
     private static final String BG_PATH      = "/resources/background.png";
     private static final String COLUMNS_PATH = "/resources/columns.png";
@@ -35,6 +25,9 @@ public class MainMenuFrame extends JFrame {
     private static final String BTN_PVE      = "/resources/PVEButton (1).png";
     private static final String BTN_PVP      = "/resources/PVPButton (1).png";
     private static final String BTN_EXIT     = "/resources/exitButton (3).png";
+
+    // Updated path to point to the new pixel-art asset
+    private static final String BTN_LEADER   = "/resources/leaderboardBUTTON.png";
 
     private ImagePanel       holderPanel;
     private JPanel           buttonsInsideHolder;
@@ -54,19 +47,15 @@ public class MainMenuFrame extends JFrame {
         lp.setLayout(null);
         setContentPane(lp);
 
-        // Layer 0 — Background
         BackgroundPanel bg = new BackgroundPanel(BG_PATH);
         lp.add(bg, JLayeredPane.DEFAULT_LAYER);
 
-        // Layer 1 — Columns
         ScaledImagePanel columns = new ScaledImagePanel(COLUMNS_PATH);
         lp.add(columns, JLayeredPane.PALETTE_LAYER);
 
-        // Layer 2 — Title
         titlePanel = new ScaledImagePanel(TITLE_PATH);
         lp.add(titlePanel, JLayeredPane.MODAL_LAYER);
 
-        // Layer 3 — Stone Holder
         holderPanel = new ImagePanel(HOLDER_PATH);
         holderPanel.setLayout(new GridBagLayout());
         lp.add(holderPanel, JLayeredPane.POPUP_LAYER);
@@ -88,21 +77,27 @@ public class MainMenuFrame extends JFrame {
         buttonsInsideHolder.add(Box.createVerticalGlue());
         holderPanel.add(buttonsInsideHolder);
 
-        // Layer 4 — Exit button
+        leaderboardButton = createImageButton(BTN_LEADER);
+
+        // --- CHANGE: Manual text is no longer needed ---
+        // leaderboardButton.setText("Leaderboard");
+
         exitGameButton = createImageButton(BTN_EXIT);
-        exitRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        exitGameButton.setText("Exit");
+
+        exitRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
         exitRow.setOpaque(false);
+        exitRow.add(leaderboardButton);
         exitRow.add(exitGameButton);
         lp.add(exitRow, JLayeredPane.DRAG_LAYER);
 
-        // Layer 5 — Trophy
         trophyPanel = new TrophyPanel();
         lp.add(trophyPanel, JLayeredPane.DRAG_LAYER);
 
-        // Actions
         PVPButton.addActionListener(   e -> launchMode(GameModeType.PVP));
         PVEButton.addActionListener(   e -> launchMode(GameModeType.PVE));
         arcadeButton.addActionListener(e -> launchMode(GameModeType.ARCADE));
+        leaderboardButton.addActionListener(e -> { dispose(); new LeaderboardFrame(); });
         exitGameButton.addActionListener(e -> { dispose(); new WelcomeScreenPage(); });
 
         addComponentListener(new ComponentAdapter() {
@@ -119,7 +114,6 @@ public class MainMenuFrame extends JFrame {
     @Override
     public void dispose() { ScreenManager.unregister(this); super.dispose(); }
 
-    // ── Responsive Layout ──────────────────────────────────────
     private void reposition(JLayeredPane pane, JPanel bg, JPanel columns) {
         int w = pane.getWidth(), h = pane.getHeight();
         if (w == 0 || h == 0) return;
@@ -127,21 +121,18 @@ public class MainMenuFrame extends JFrame {
         bg.setBounds(0, 0, w, h);
         columns.setBounds(0, 0, w, h);
 
-        // Calculate Holder proportions securely bounded
         int holderW = Math.min(600, (int)(w * 0.55));
         int holderH = Math.min(680, (int)(h * 0.85));
         int holderX = (w - holderW) / 2;
         int holderY = (int)(h * 0.10);
         holderPanel.setBounds(holderX, holderY, holderW, holderH);
 
-        // Calculate Title bounds securely
         int titleW = Math.min(680, (int)(w * 0.65));
         int titleH = (int)(titleW * 0.30);
         int titleX = (w - titleW) / 2;
         int titleY = Math.max(0, holderY - (int)(titleH * 0.60));
         titlePanel.setBounds(titleX, titleY, titleW, titleH);
 
-        // Size Main Buttons relative to holder
         int btnW = (int)(holderW * 0.65);
         int btnH = (int)(btnW * 0.28);
         int gap  = Math.max(10, (int)(holderH * 0.03));
@@ -154,31 +145,30 @@ public class MainMenuFrame extends JFrame {
             b.setAlignmentX(Component.CENTER_ALIGNMENT);
         }
 
-        // Size Exit Button
-        int exitW = (int)(btnW * 0.50);
+        // --- OPTIONAL: Adjust the size of the exit/leaderboard buttons if needed ---
+        // This size might feel different now that it's a fixed image.
+        int exitW = (int)(btnW * 0.45);
         int exitH = (int)(exitW * 0.45);
         Dimension exitSize = new Dimension(exitW, exitH);
-        exitGameButton.setPreferredSize(exitSize);
-        exitGameButton.setMinimumSize(exitSize);
-        exitGameButton.setMaximumSize(exitSize);
 
-        // Layout inner holder content dynamically
+        exitGameButton.setPreferredSize(exitSize);
+        leaderboardButton.setPreferredSize(exitSize);
+        exitGameButton.setContentAreaFilled(false);
+        leaderboardButton.setContentAreaFilled(false);
+
         buttonsInsideHolder.setBounds(0, 0, holderW, holderH);
         buttonsInsideHolder.removeAll();
         buttonsInsideHolder.add(Box.createVerticalGlue());
-        buttonsInsideHolder.add(Box.createVerticalStrut((int)(holderH * 0.15))); // Padding from top of stone
+        buttonsInsideHolder.add(Box.createVerticalStrut((int)(holderH * 0.15)));
         buttonsInsideHolder.add(PVPButton);
         buttonsInsideHolder.add(Box.createVerticalStrut(gap));
         buttonsInsideHolder.add(PVEButton);
         buttonsInsideHolder.add(Box.createVerticalStrut(gap));
         buttonsInsideHolder.add(arcadeButton);
-
         buttonsInsideHolder.add(Box.createVerticalGlue());
-        buttonsInsideHolder.add(exitGameButton);
-        buttonsInsideHolder.add(Box.createVerticalStrut((int)(holderH * 0.08))); // Padding from bottom
+        buttonsInsideHolder.add(exitRow);
+        buttonsInsideHolder.add(Box.createVerticalStrut((int)(holderH * 0.08)));
 
-        // ── Trophy Responsive Bounding ──
-        // Finds the exact visual gap between the right side of the holder and the right pillar.
         int rightPillarLeft = (int)(w * 0.85);
         int gapCentreX = holderX + holderW + (rightPillarLeft - holderX - holderW) / 2;
         int trophySize = Math.min(140, Math.max(70, (int)(Math.min(w, h) * 0.12)));
@@ -187,9 +177,7 @@ public class MainMenuFrame extends JFrame {
         int trophyY = holderY + (holderH - trophySize) / 2;
         trophyPanel.setBounds(trophyX, trophyY, trophySize, trophySize);
 
-        // Force UI to recalculate sizes internally
         holderPanel.revalidate(); holderPanel.repaint();
-        exitRow.revalidate();     exitRow.repaint();
         pane.revalidate();        pane.repaint();
     }
 
@@ -202,12 +190,24 @@ public class MainMenuFrame extends JFrame {
         }
     }
 
-    // ── Image Button ──────────────────────────────────────────
     private JButton createImageButton(String path) {
         Image img = loadImage(path);
         JButton btn = new JButton() {
             @Override protected void paintComponent(Graphics g) {
-                if (img == null) { super.paintComponent(g); return; }
+                // FALLBACK PAINTING: This draws the yellow rectangle seen before
+                // It will only execute if img == null, so if your asset path is correct,
+                // this code is ignored.
+                if (img == null) {
+                    g.setColor(new Color(0xC8, 0xA0, 0x28));
+                    g.fillRect(0, 0, getWidth(), getHeight());
+                    g.setColor(Color.BLACK);
+                    // The font settings here are what control the text in the placeholder
+                    g.setFont(new Font("Serif", Font.PLAIN, 12));
+                    g.drawString(getText(), 10, getHeight()/2 + 5);
+                    return;
+                }
+
+                // MAIN IMAGE PAINTING (executes when the asset is found)
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -215,7 +215,6 @@ public class MainMenuFrame extends JFrame {
                 int iw = img.getWidth(null), ih = img.getHeight(null);
                 if (iw <= 0 || ih <= 0) { g2.dispose(); return; }
 
-                // Safe Proportional scaling
                 double scale = Math.min((double)getWidth()/iw, (double)getHeight()/ih);
                 int dw = (int)(iw*scale), dh = (int)(ih*scale);
 
@@ -234,11 +233,10 @@ public class MainMenuFrame extends JFrame {
 
     private Image loadImage(String path) {
         URL url = getClass().getResource(path);
-        if (url == null) { System.err.println("Missing: " + path); return null; }
+        if (url == null) return null;
         return new ImageIcon(url).getImage();
     }
 
-    // ── Aspect Ratio Draw Utilities ───────────────────────────
     protected void drawImageFill(Graphics2D g2, Image img, int x, int y, int w, int h) {
         if (img == null) return;
         int iw = img.getWidth(null), ih = img.getHeight(null);
@@ -259,7 +257,6 @@ public class MainMenuFrame extends JFrame {
         g2.drawImage(img, dx, dy, dw, dh, null);
     }
 
-    // ── Custom Scaled Panels ──────────────────────────────────
     private class BackgroundPanel extends JPanel {
         private final Image img;
         BackgroundPanel(String p) { img = loadImage(p); setOpaque(true); setBackground(Color.BLACK); }
@@ -302,7 +299,6 @@ public class MainMenuFrame extends JFrame {
         }
     }
 
-    // ── Trophy Panel ──────────────────────────────────────────
     private class TrophyPanel extends JPanel {
         private float time = 0f;
         TrophyPanel() {
@@ -332,11 +328,13 @@ public class MainMenuFrame extends JFrame {
             for (int ring = 6; ring >= 1; ring--) {
                 int alpha = Math.min(255, 18 * (7 - ring));
                 g2.setColor(new Color(0xC8, 0xA0, 0x28, alpha));
-                g2.setStroke(new BasicStroke(ring * 1.5f));
+                g2.setStroke(new BasicStroke(ring * 2f));
                 g2.drawPolygon(xs, ys, 4);
             }
 
-            g2.setPaint(new GradientPaint(cx, cy - sz, new Color(0xFF, 0xF0, 0x60), cx, cy + sz, new Color(0xFF, 0x80, 0x00)));
+            g2.setPaint(new GradientPaint(
+                    cx, cy - sz, new Color(0xFF, 0xF0, 0x60),
+                    cx, cy + sz, new Color(0xFF, 0x80, 0x00)));
             g2.fillPolygon(xs, ys, 4);
 
             g2.setColor(new Color(255, 255, 255, 105));
@@ -347,15 +345,18 @@ public class MainMenuFrame extends JFrame {
             g2.setStroke(new BasicStroke(1.5f));
             g2.drawPolygon(xs, ys, 4);
 
-            int fontSize = Math.max(10, (int)(labelH * 0.70));
+            int fontSize = Math.max(8, (int)(labelH * 0.70));
             g2.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, fontSize));
             FontMetrics fm = g2.getFontMetrics();
             String lbl = "Arcade";
             int lx = cx - fm.stringWidth(lbl) / 2;
             int ly = gemArea + fm.getAscent();
 
-            g2.setColor(new Color(0, 0, 0, 120)); g2.drawString(lbl, lx + 1, ly + 1);
-            g2.setColor(new Color(0xC8, 0xA0, 0x28)); g2.drawString(lbl, lx, ly);
+            g2.setColor(new Color(0, 0, 0, 120));
+            g2.drawString(lbl, lx + 1, ly + 1);
+            g2.setColor(new Color(0xC8, 0xA0, 0x28));
+            g2.drawString(lbl, lx, ly);
+
             g2.dispose();
         }
     }

@@ -3,6 +3,7 @@ package encantadia.ui.frames.battleModeFrames;
 import encantadia.ScreenManager;
 import encantadia.battle.ai.EnemyAI;
 import encantadia.battle.arcade.ArcadeModeManager;
+import encantadia.battle.arcade.DatabaseManager;
 import encantadia.battle.engine.TurnManager;
 import encantadia.battle.result.TurnResult;
 import encantadia.battle.skill.Skill;
@@ -11,7 +12,8 @@ import encantadia.characters.Character;
 import encantadia.characters.animation.CharacterAnimator;
 import encantadia.ui.frames.ArcadeTowerFrame;
 import encantadia.ui.frames.ArcadeVictoryFrame;
-import encantadia.ui.frames.MainMenuFrame;
+import encantadia.ui.frames.LeaderboardFrame;
+import encantadia.ui.frames.CharacterSelectionFrame;
 
 import javax.swing.*;
 import java.awt.*;
@@ -22,24 +24,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * ArcadeModeBattleFrame
- * FIXED: Restored the missing drawFlankingTimers method and fixed the method call.
- */
 public class ArcadeModeBattleFrame extends JFrame {
 
-    // ── Timers ────────────────────────────────────────────────
     private javax.swing.Timer turnCountdownTimer;
     private int               timeLeft = 10;
-
     private static final int  MATCH_DURATION_SECONDS = 60;
     private javax.swing.Timer matchTimer;
     private int               matchTimeLeft = MATCH_DURATION_SECONDS;
-
     private static final String BG_PATH          = "/resources/backgroundArcade.png";
     private static final int    ENEMY_TURN_DELAY = 1100;
 
-    // ── Arcade Exclusive Mechanics ────────────────────────────
     private boolean           ultimateUnlocked = false;
     private int               summonCharges    = 3;
     private boolean           isSummoning      = false;
@@ -58,7 +52,6 @@ public class ArcadeModeBattleFrame extends JFrame {
             "Tyrone", "Makelan Shere", "Claire", "Dirk", "Flamara", "Dea", "Adamus", "Tera"
     };
 
-    // ── Color Palette ──────────────────────────────────────────
     private static final Color PLAYER_CLR = new Color(0x2E, 0x8B, 0x57);
     private static final Color ENEMY_CLR  = new Color(0xB0, 0x2A, 0x2A);
     private static final Color BOSS_CLR   = new Color(0xAA, 0x00, 0xFF);
@@ -69,7 +62,6 @@ public class ArcadeModeBattleFrame extends JFrame {
     private static final Color RED_CRIT   = new Color(0xCC, 0x22, 0x22);
     private static final Color GREEN_RDY  = new Color(0x60, 0xCC, 0x60);
 
-    // ── Engine & Controllers ──────────────────────────────────
     private final Character         playerCharacter;
     private final Character         enemyCharacter;
     private final ArcadeModeManager arcadeManager;
@@ -84,7 +76,6 @@ public class ArcadeModeBattleFrame extends JFrame {
     private float glowTick         = 0f;
     private Timer glowAnimTimer;
 
-    // ── UI Refs ───────────────────────────────────────────────
     private BattleCanvas battleCanvas;
     private JPanel       skillsLayer;
     private JPanel       overlayLayer;
@@ -126,7 +117,6 @@ public class ArcadeModeBattleFrame extends JFrame {
             if (battleCanvas != null) battleCanvas.repaint();
         });
 
-        // Setup persistent summon state if Ultimate was previously drafted
         if (playerCharacter.getSkills().size() >= 4) {
             ultimateUnlocked = true;
             restoreAssistAnimator();
@@ -286,10 +276,6 @@ public class ArcadeModeBattleFrame extends JFrame {
         skillsLayer.repaint();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Combat Logic & Tag-Team Summons
-    // ══════════════════════════════════════════════════════════
-
     private void onPlayerSkill(int si) {
         if (timeUpTriggered) return;
         stopTurnTimer();
@@ -318,7 +304,7 @@ public class ArcadeModeBattleFrame extends JFrame {
             flushResult(res);
 
             enemyFlashAlpha = 1.0f;
-            if (enemyAnimator != null) enemyAnimator.triggerHit(); // Knockback
+            if (enemyAnimator != null) enemyAnimator.triggerHit();
             refreshUI();
 
             Timer recoveryTimer = new Timer((durationMs - impactDelay) + 150, ev -> {
@@ -350,7 +336,7 @@ public class ArcadeModeBattleFrame extends JFrame {
 
             Timer entrance = new Timer(400, ev -> {
                 ((Timer)ev.getSource()).stop();
-                assistAnimator.toSkill(0); // Mapped as index 0 in the assist wrapper
+                assistAnimator.toSkill(0);
 
                 int durationMs = assistDurations[0];
                 int impactDelay = (int)(durationMs * 0.65);
@@ -367,7 +353,7 @@ public class ArcadeModeBattleFrame extends JFrame {
                     Timer recoveryTimer = new Timer((durationMs - impactDelay) + 200, rEv -> {
                         ((Timer)rEv.getSource()).stop();
 
-                        isSummoning = false; // Revert canvas to Player
+                        isSummoning = false;
                         if (playerAnimator != null) playerAnimator.toIdle();
                         refreshUI();
 
@@ -443,10 +429,6 @@ public class ArcadeModeBattleFrame extends JFrame {
         if (myTurn) startTurnTimer(); else stopTurnTimer();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Win / Rewards / Visual Overlays
-    // ══════════════════════════════════════════════════════════
-
     private void onPlayerWon() {
         stopMatchTimer(); stopTurnTimer();
         setPlayerEnabled(false); processingTurn = false;
@@ -500,7 +482,6 @@ public class ArcadeModeBattleFrame extends JFrame {
 
                 int cx = getWidth() / 2, cy = getHeight() / 2;
 
-                // Mystical Rising Aura Particles
                 for(int i=0; i<25; i++) {
                     double phase = pTick + i * 0.4;
                     int px = cx + (int)(Math.sin(phase * 0.9 + i) * 120);
@@ -582,7 +563,6 @@ public class ArcadeModeBattleFrame extends JFrame {
                 ultimateUnlocked = true;
                 summonCharges = 3;
 
-                // Construct Assist Animator
                 for (Character c : getFullRoster()) {
                     if (c.getName().equals(playerCharacter.getName())) continue;
                     for (int k = 0; k < c.getSkills().size(); k++) {
@@ -657,6 +637,7 @@ public class ArcadeModeBattleFrame extends JFrame {
 
     private void transitionToTower() { dispose(); new ArcadeTowerFrame(playerCharacter, arcadeManager); }
 
+    // ── Defeat / Surrender Logic ──────────────────────────────
     private void onPlayerLost() {
         stopMatchTimer(); stopTurnTimer();
         setPlayerEnabled(false); processingTurn = false;
@@ -666,16 +647,83 @@ public class ArcadeModeBattleFrame extends JFrame {
 
         log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log("💀  " + enemyCharacter.getName() + " has defeated you!");
-        new Timer(1200, e -> { ((Timer)e.getSource()).stop();
-            showInfoOverlay("💀  FALLEN",
-                    "You have fallen in battle.\n" + enemyCharacter.getName() + " proved too powerful.\n\nReturning to main menu...",
-                    () -> { dispose(); new MainMenuFrame(); }); })
-        {{ setRepeats(false); start(); }};
+
+        new Timer(1200, e -> {
+            ((Timer)e.getSource()).stop();
+            showDefeatOptionsOverlay();
+        }).start();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Timers & General Methods
-    // ══════════════════════════════════════════════════════════
+    private void showDefeatOptionsOverlay() {
+        overlayLayer.removeAll();
+        overlayLayer.setVisible(true);
+
+        JPanel dim = makeDim();
+        dim.setLayout(new GridBagLayout());
+
+        JPanel card = makeCard(500, 260);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createEmptyBorder(28, 36, 28, 36));
+
+        card.add(cardTitle("💀  FALLEN"));
+        card.add(Box.createVerticalStrut(14));
+        card.add(cardBody("Your strength wanes.\nWill you try again, or record your legacy and surrender?"));
+        card.add(Box.createVerticalStrut(28));
+
+        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        btnRow.setOpaque(false);
+
+        JButton continueBtn = makeGoldOverlayButton("Continue (New Run)");
+        continueBtn.addActionListener(e -> {
+            dispose();
+            new encantadia.ui.frames.CharacterSelectionFrame(encantadia.gamemode.GameModeType.ARCADE);
+        });
+
+        JButton surrenderBtn = makeGoldOverlayButton("Surrender & Record");
+        surrenderBtn.addActionListener(e -> processSurrender());
+
+        btnRow.add(continueBtn);
+        btnRow.add(surrenderBtn);
+        card.add(btnRow);
+
+        dim.add(card);
+        mountOverlay(dim);
+    }
+
+    private void processSurrender() {
+        String tag = promptForTag();
+        if (tag != null) {
+            DatabaseManager.getInstance().saveRecord(
+                    tag,
+                    120,   // TODO: replace with actual time
+                    5000,  // TODO: replace with actual damage dealt
+                    4000,  // TODO: replace with actual damage received
+                    false
+            );
+            dispose();
+            new LeaderboardFrame();
+        }
+    }
+
+    public String promptForTag() {
+        while (true) {
+            String tag = JOptionPane.showInputDialog(this, "Enter 3-Letter Player Tag:", "Record Stats", JOptionPane.PLAIN_MESSAGE);
+            if (tag == null) return null;
+            tag = tag.trim().toUpperCase();
+
+            if (tag.length() != 3 || !tag.matches("[A-Z]{3}")) {
+                JOptionPane.showMessageDialog(this, "Tag must be EXACTLY 3 letters (A-Z).", "Invalid Input", JOptionPane.ERROR_MESSAGE);
+                continue;
+            }
+            if (DatabaseManager.getInstance().isNameTaken(tag)) {
+                JOptionPane.showMessageDialog(this, "Tag '" + tag + "' is already taken! Choose another.", "Duplicate Tag", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+            return tag;
+        }
+    }
+
+    // ── Timers ────────────────────────────────────────────────
     private void startTurnTimer() {
         if (timeUpTriggered) return;
         stopTurnTimer(); timeLeft = 10;
@@ -731,7 +779,6 @@ public class ArcadeModeBattleFrame extends JFrame {
 
         if (battleCanvas != null) battleCanvas.repaint();
 
-        // Pause to show "TIME UP" overlay
         Timer judgeTimer = new Timer(2000, e -> {
             ((Timer)e.getSource()).stop();
             double pPct = (double)playerCharacter.getCurrentHP() / playerCharacter.getMaxHP();
@@ -808,9 +855,7 @@ public class ArcadeModeBattleFrame extends JFrame {
         am.put("arc_skill_3",new AbstractAction(){@Override public void actionPerformed(ActionEvent e){if(!ultimateUnlocked)return;if(skillBtns[3]!=null&&skillBtns[3].isEnabled())onPlayerSkill(3);}});
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  BattleCanvas - Rendering Core
-    // ══════════════════════════════════════════════════════════
+    // ── BattleCanvas ──────────────────────────────────────────
     private class BattleCanvas extends JPanel {
         private final Image p1Frame, p2Frame;
         private final boolean isBoss;
@@ -836,7 +881,6 @@ public class ArcadeModeBattleFrame extends JFrame {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,     RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-            // ── 1. Arcade Center Pill ──
             String ctTxt = isBoss ? "⚡  FINAL BOSS  ⚡" : "Enemy  " + idx + "  of  " + total;
             Color  ctClr = isBoss ? BOSS_CLR : GOLD;
             g2.setFont(new Font("Serif", Font.BOLD|Font.ITALIC, Math.max(14,(int)(18*sc))));
@@ -859,17 +903,14 @@ public class ArcadeModeBattleFrame extends JFrame {
 
             hudBottomY = tabY + tabH;
 
-            // ── 2. Flanking Timers ──
             drawFlankingTimers(g2, W, tabX, tabY, tabW, tabH, sc);
 
-            // ── 3. Portraits & HUD ──
             int portW=(int)(82*sc),portH=(int)(82*sc),hpW=(int)(230*sc),hpH=(int)(16*sc);
             int pillW=(int)(140*sc),pillH=(int)(24*sc),portY = hudBottomY + (int)(8*sc);
 
-            // P1
-            int p1x=(int)(10*sc);
-            drawPortrait(g2,p1Frame,p1x,portY,portW,portH,PLAYER_CLR,p1Active);
-            int phx=p1x+portW+(int)(8*sc),phy=portY+(int)(8*sc);
+            int ppx=(int)(10*sc);
+            drawPortrait(g2,p1Frame,ppx,portY,portW,portH,PLAYER_CLR,p1Active);
+            int phx=ppx+portW+(int)(8*sc),phy=portY+(int)(8*sc);
             drawHPBar(g2,phx,phy,hpW,hpH,playerCharacter,PLAYER_CLR);
             g2.setFont(new Font("SansSerif",Font.PLAIN,Math.max(8,(int)(10*sc))));
             drawShadow(g2,"HP: "+playerCharacter.getCurrentHP()+" / "+playerCharacter.getMaxHP(),phx,phy+hpH+(int)(10*sc),new Color(0xFF,0xF5,0xDC,190));
@@ -877,7 +918,6 @@ public class ArcadeModeBattleFrame extends JFrame {
             g2.setFont(new Font("SansSerif",Font.BOLD,Math.max(9,(int)(11*sc))));
             drawShadow(g2,"PLAYER",phx,phy-(int)(3*sc),new Color(0xEE,0xEE,0xEE));
 
-            // P2
             Color ec=isBoss?BOSS_CLR:ENEMY_CLR;
             int epx=W-(int)(10*sc)-portW;
             drawPortrait(g2,p2Frame,epx,portY,portW,portH,ec,!p1Active);
@@ -896,15 +936,12 @@ public class ArcadeModeBattleFrame extends JFrame {
             fm=g2.getFontMetrics();
             drawShadow(g2,tt,(W-fm.stringWidth(tt))/2,hudBottomY+(int)(4*sc),GOLD);
 
-            // ── ACTIVE SPRITE ZONE ──
             int groundY    = H - (int)(170 * sc);
             int spriteSize = (int)(220 * sc);
 
-            // Apply Kinetic Knockback Offset
             int p1SpriteX = (int)(W * 0.15) - (playerAnimator != null ? playerAnimator.getKnockbackOffset() : 0);
             int p2SpriteX = (int)(W * 0.85) - spriteSize + (enemyAnimator != null ? enemyAnimator.getKnockbackOffset() : 0);
 
-            // Player 1 Sprite
             if (isSummoning && assistAnimator != null) {
                 Shape savedClip = g2.getClip();
                 assistAnimator.draw(g2, p1SpriteX, groundY - spriteSize, spriteSize, spriteSize, this);
@@ -916,13 +953,12 @@ public class ArcadeModeBattleFrame extends JFrame {
             }
 
             if (playerFlashAlpha > 0) {
-                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, playerFlashAlpha * 0.8f));
-                g2.setColor(new Color(255, 0, 0));
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, playerFlashAlpha * 0.65f));
+                g2.setColor(new Color(255, 20, 20));
                 g2.fillOval(p1SpriteX - spriteSize/4, groundY - spriteSize + spriteSize/4, (int)(spriteSize*1.5), spriteSize);
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
             }
 
-            // Player 2 Sprite [MIRRORED]
             int eSize = isBoss ? (int)(spriteSize * 1.45) : spriteSize;
             int eX    = (int)(W * 0.85) - eSize + (enemyAnimator != null ? enemyAnimator.getKnockbackOffset() : 0);
             int eY    = groundY - eSize;
@@ -938,13 +974,12 @@ public class ArcadeModeBattleFrame extends JFrame {
             }
 
             if (enemyFlashAlpha > 0) {
-                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, enemyFlashAlpha * 0.8f));
-                g2.setColor(new Color(255, 0, 0));
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, enemyFlashAlpha * 0.65f));
+                g2.setColor(new Color(255, 20, 20));
                 g2.fillOval(eX - eSize/4, eY + eSize/4, (int)(eSize*1.5), eSize);
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
             }
 
-            // TIME UP Overlay
             if (timeUpTriggered) {
                 g2.setColor(new Color(0, 0, 0, 150));
                 g2.fillRect(0, 0, W, H);
@@ -973,91 +1008,128 @@ public class ArcadeModeBattleFrame extends JFrame {
         }
 
         private void drawFlankingTimers(Graphics2D g2, int W, int tabX, int tabY, int tabW, int tabH, double sc) {
-            int padH = (int)(12 * sc), padV = (int)(5 * sc);
-
-            // Match Timer
-            int matchFontSz = Math.max(14, (int)(19 * sc));
+            int matchFontSz = Math.max(16, (int)(22 * sc));
             g2.setFont(new Font("Monospaced", Font.BOLD, matchFontSz));
             FontMetrics mfm = g2.getFontMetrics();
-            int mins = matchTimeLeft / 60, secs = matchTimeLeft % 60;
-            String mTxt = String.format("%02d:%02d", mins, secs);
-            Color matchColor = matchTimeLeft > 40 ? GOLD : matchTimeLeft > 15 ? ORANGE_LOW : RED_CRIT;
 
-            int mW = mfm.stringWidth(mTxt) + padH * 2, mH = mfm.getHeight() + padV * 2;
+            int mins = matchTimeLeft / 60;
+            int secs = matchTimeLeft % 60;
+            String matchTxt = String.format("%02d:%02d", mins, secs);
+
+            Color matchColor = matchTimeLeft > 40 ? GOLD
+                    : matchTimeLeft > 15 ? ORANGE_LOW : RED_CRIT;
+
+            int mPadH = (int)(16 * sc), mPadV = (int)(5 * sc);
+            int mW = mfm.stringWidth(matchTxt) + mPadH * 2;
+            int mH = mfm.getHeight() + mPadV * 2;
             int mX = Math.max((int)(6*sc), tabX - mW - (int)(8*sc));
             int mY = tabY + (tabH - mH) / 2;
             if (mX < (int)(4*sc)) mX = (int)(4*sc);
 
-            g2.setColor(new Color(0x06, 0x03, 0x01, 225)); g2.fillRoundRect(mX, mY, mW, mH, 12, 12);
-            float mAlpha = matchTimeLeft <= 15 ? 130 + 125*(float)Math.abs(Math.sin(glowTick*2.5f)) : 185;
+            g2.setColor(new Color(0x06, 0x03, 0x01, 225));
+            g2.fillRoundRect(mX, mY, mW, mH, 12, 12);
+            float mAlpha = matchTimeLeft <= 15 ? 130 + 125 * (float) Math.abs(Math.sin(glowTick * 2.5f)) : 180;
             g2.setStroke(new BasicStroke(2f));
-            g2.setColor(new Color(matchColor.getRed(), matchColor.getGreen(), matchColor.getBlue(), Math.min(255,(int)mAlpha)));
+            g2.setColor(new Color(matchColor.getRed(), matchColor.getGreen(), matchColor.getBlue(), Math.min(255, (int) mAlpha)));
             g2.drawRoundRect(mX, mY, mW, mH, 12, 12);
-            g2.setStroke(new BasicStroke(1f)); g2.setColor(new Color(255,255,255,16)); g2.drawRoundRect(mX+2, mY+2, mW-4, mH-4, 10, 10);
-            int mTX = mX + (mW - mfm.stringWidth(mTxt)) / 2, mTY = mY + padV + mfm.getAscent();
-            g2.setColor(new Color(0,0,0,150)); g2.drawString(mTxt, mTX+1, mTY+1);
-            g2.setColor(matchColor); g2.drawString(mTxt, mTX, mTY);
+            g2.setStroke(new BasicStroke(1f));
+            g2.setColor(new Color(255, 255, 255, 18));
+            g2.drawRoundRect(mX + 2, mY + 2, mW - 4, mH - 4, 10, 10);
+            int mTX = mX + (mW - mfm.stringWidth(matchTxt)) / 2;
+            int mTY = mY + mPadV + mfm.getAscent();
+            g2.setColor(new Color(0, 0, 0, 150));
+            g2.drawString(matchTxt, mTX + 1, mTY + 1);
+            g2.setColor(matchColor);
+            g2.drawString(matchTxt, mTX, mTY);
 
-            // Turn Timer
             if (turnCountdownTimer != null && turnCountdownTimer.isRunning()) {
-                int turnFontSz = Math.max(13, (int)(17 * sc));
+                int turnFontSz = Math.max(11, (int)(14 * sc));
                 g2.setFont(new Font("Serif", Font.BOLD, turnFontSz));
                 FontMetrics tfm = g2.getFontMetrics();
-                Color turnColor = timeLeft > 6 ? new Color(0xEE,0xEE,0xEE) : timeLeft > 3 ? ORANGE_LOW : RED_CRIT;
-                String tTxt = "TURN  " + timeLeft;
-                int tW = tfm.stringWidth(tTxt) + padH * 2, tH = tfm.getHeight() + padV * 2;
+
+                Color turnColor = timeLeft > 6 ? new Color(0xEE, 0xEE, 0xEE)
+                        : timeLeft > 3 ? ORANGE_LOW : RED_CRIT;
+                String turnTxt = "TURN  " + timeLeft;
+
+                int tPadH = (int)(14 * sc), tPadV = (int)(4 * sc);
+                int tW = tfm.stringWidth(turnTxt) + tPadH * 2;
+                int tH = tfm.getHeight() + tPadV * 2;
                 int tX = tabX + tabW + (int)(8*sc);
                 if (tX + tW > W - (int)(4*sc)) tX = W - tW - (int)(4*sc);
                 int tY = tabY + (tabH - tH) / 2;
 
-                g2.setColor(new Color(0x06, 0x03, 0x01, 215)); g2.fillRoundRect(tX, tY, tW, tH, tH, tH);
-                float tAlpha = timeLeft <= 3 ? 120 + 135*(float)Math.abs(Math.sin(glowTick*3)) : 155;
+                g2.setColor(new Color(0x06, 0x03, 0x01, 215));
+                g2.fillRoundRect(tX, tY, tW, tH, tH, tH);
+                float tAlpha = timeLeft <= 3 ? 120 + 135 * (float) Math.abs(Math.sin(glowTick * 3)) : 150;
                 g2.setStroke(new BasicStroke(1.5f));
-                g2.setColor(new Color(turnColor.getRed(), turnColor.getGreen(), turnColor.getBlue(), Math.min(255,(int)tAlpha)));
+                g2.setColor(new Color(turnColor.getRed(), turnColor.getGreen(), turnColor.getBlue(), Math.min(255, (int) tAlpha)));
                 g2.drawRoundRect(tX, tY, tW, tH, tH, tH);
-                int tTX = tX + (tW - tfm.stringWidth(tTxt)) / 2, tTY = tY + padV + tfm.getAscent();
-                g2.setColor(new Color(0,0,0,130)); g2.drawString(tTxt, tTX+1, tTY+1);
-                g2.setColor(turnColor); g2.drawString(tTxt, tTX, tTY);
+                int tTX = tX + (tW - tfm.stringWidth(turnTxt)) / 2;
+                int tTY = tY + tPadV + tfm.getAscent();
+                g2.setColor(new Color(0, 0, 0, 130));
+                g2.drawString(turnTxt, tTX + 1, tTY + 1);
+                g2.setColor(turnColor);
+                g2.drawString(turnTxt, tTX, tTY);
             }
         }
 
         private void drawPortrait(Graphics2D g2, Image img, int x, int y, int w, int h, Color accent, boolean active) {
             if (active) {
-                float a = 0.25f + 0.15f * (float)Math.sin(glowTick);
+                float a = 0.22f + 0.16f * (float)Math.sin(glowTick);
                 for (int r = 5; r >= 1; r--) {
                     int sp = r*3;
                     g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),Math.min(255,(int)(a*80/r))));
-                    g2.setStroke(new BasicStroke(sp)); g2.drawRoundRect(x-sp/2,y-sp/2,w+sp,h+sp,10,10);
+                    g2.setStroke(new BasicStroke(sp));
+                    g2.drawRoundRect(x-sp/2,y-sp/2,w+sp,h+sp,10,10);
                 }
             }
-            g2.setColor(new Color(0x08,0x05,0x02,200)); g2.fillRoundRect(x,y,w,h,8,8);
-            if (img != null) drawImageProportional(g2, img, x, y, w, h);
+            g2.setColor(new Color(0x08,0x05,0x02,210));
+            g2.fillRoundRect(x,y,w,h,8,8);
+            if (img != null) {
+                double scale = Math.min((double) w / img.getWidth(null), (double) h / img.getHeight(null));
+                int dw = (int) (img.getWidth(null) * scale), dh = (int) (img.getHeight(null) * scale);
+                g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
+            }
             g2.setStroke(new BasicStroke(2));
-            g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),active?220:100));
+            g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),active?220:90));
             g2.drawRoundRect(x,y,w,h,8,8);
         }
 
         private void drawHPBar(Graphics2D g2, int x, int y, int w, int h, Character c, Color base) {
             double pct = Math.max(0, Math.min(1.0, (double)c.getCurrentHP() / c.getMaxHP()));
             Color bar = pct <= 0.25 ? RED_CRIT : pct <= 0.50 ? ORANGE_LOW : base;
-            g2.setColor(new Color(0x08,0x04,0x02,220)); g2.fillRoundRect(x,y,w,h,h,h);
+            g2.setColor(new Color(0x08,0x04,0x02,220));
+            g2.fillRoundRect(x,y,w,h,h,h);
             int fw = (int)(w*pct);
-            if (fw > 2) { g2.setPaint(new GradientPaint(x,y,bar.brighter(),x,y+h,bar.darker())); g2.fillRoundRect(x,y,fw,h,h,h); }
-            g2.setStroke(new BasicStroke(1)); g2.setColor(new Color(0xFF,0xFF,0xFF,55)); g2.drawRoundRect(x,y,w,h,h,h);
+            if (fw > 2) {
+                g2.setPaint(new GradientPaint(x,y,bar.brighter(),x,y+h,bar.darker()));
+                g2.fillRoundRect(x,y,fw,h,h,h);
+            }
+            g2.setStroke(new BasicStroke(1));
+            g2.setColor(new Color(0xFF,0xFF,0xFF,50));
+            g2.drawRoundRect(x,y,w,h,h,h);
         }
 
-        private void drawNamePill(Graphics2D g2, String text, int x, int y, int w, int h, Color bg, Color fg) {
-            g2.setColor(bg); g2.fillRoundRect(x,y,w,h,h,h);
+        private void drawNamePill(Graphics2D g2, String t, int x, int y, int w, int h, Color bg, Color fg) {
+            g2.setColor(bg);
+            g2.fillRoundRect(x,y,w,h,h,h);
             g2.setStroke(new BasicStroke(1));
-            g2.setColor(new Color(fg.getRed(),fg.getGreen(),fg.getBlue(),130)); g2.drawRoundRect(x,y,w,h,h,h);
-            g2.setFont(new Font("Serif",Font.BOLD,Math.max(9,h-6))); FontMetrics fm = g2.getFontMetrics();
-            int tx = x+(w-fm.stringWidth(text))/2, ty = y+(h+fm.getAscent()-fm.getDescent())/2;
-            g2.setColor(new Color(0,0,0,100)); g2.drawString(text,tx+1,ty+1);
-            g2.setColor(fg); g2.drawString(text,tx,ty);
+            g2.setColor(new Color(fg.getRed(),fg.getGreen(),fg.getBlue(),130));
+            g2.drawRoundRect(x,y,w,h,h,h);
+            g2.setFont(new Font("Serif",Font.BOLD,Math.max(9,h-6)));
+            FontMetrics fm = g2.getFontMetrics();
+            int tx = x+(w-fm.stringWidth(t))/2, ty = y+(h+fm.getAscent()-fm.getDescent())/2;
+            g2.setColor(new Color(0,0,0,100));
+            g2.drawString(t,tx+1,ty+1);
+            g2.setColor(fg);
+            g2.drawString(t,tx,ty);
         }
 
         private void drawShadow(Graphics2D g2, String t, int x, int y, Color c) {
-            g2.setColor(new Color(0,0,0,150)); g2.drawString(t,x+1,y+1); g2.setColor(c); g2.drawString(t,x,y);
+            g2.setColor(new Color(0,0,0,150));
+            g2.drawString(t,x+1,y+1);
+            g2.setColor(c);
+            g2.drawString(t,x,y);
         }
     }
 

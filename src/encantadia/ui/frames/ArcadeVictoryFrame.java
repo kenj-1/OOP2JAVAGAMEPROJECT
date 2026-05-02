@@ -8,15 +8,10 @@ import javax.swing.*;
 import java.awt.*;
 import java.net.URL;
 
-/**
- * ArcadeVictoryFrame — shown when the player clears the Arcade Tower.
- * FIXED: "Alpha out of range" crash fixed by strictly clamping particle opacity between 0 and 255.
- */
 public class ArcadeVictoryFrame extends JFrame {
 
     private static final String BG_PATH = "/resources/background (4).png";
 
-    // ── Lore lines revealed by typewriter ─────────────────────
     private static final String[] LORE_LINES = {
             "The Tower of Trials has fallen silent.",
             "Jelian and Joygen have been found — and freed.",
@@ -27,13 +22,11 @@ public class ArcadeVictoryFrame extends JFrame {
     private Timer           animTimer;
     private float           tick = 0f;
 
-    // Typewriter state
     private int    loreLineIdx  = 0;
     private int    loreCharIdx  = 0;
     private Timer  typeTimer;
     private Timer  pauseTimer;
 
-    // UI refs
     private JLabel loreLabel;
     private JLabel dotLabel;
 
@@ -52,7 +45,6 @@ public class ArcadeVictoryFrame extends JFrame {
         setVisible(true);
         ScreenManager.register(this);
 
-        // Start typewriter after a short dramatic pause
         pauseTimer = new Timer(700, e -> {
             ((Timer)e.getSource()).stop();
             startTypewriter();
@@ -70,9 +62,6 @@ public class ArcadeVictoryFrame extends JFrame {
         super.dispose();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  UI
-    // ══════════════════════════════════════════════════════════
     private void buildUI() {
         JLayeredPane lp = new JLayeredPane();
         lp.setLayout(null);
@@ -109,7 +98,6 @@ public class ArcadeVictoryFrame extends JFrame {
 
         panel.add(Box.createVerticalGlue());
 
-        // ── Title ──────────────────────────────────────────────
         JLabel titleLbl = new JLabel("✦  ARCADE CLEAR  ✦", SwingConstants.CENTER) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -121,7 +109,6 @@ public class ArcadeVictoryFrame extends JFrame {
                 String txt = getText();
                 int tx = (W - fm.stringWidth(txt)) / 2, ty = (H + fm.getAscent() - fm.getDescent()) / 2;
 
-                // Outer glow
                 for (int sp = 12; sp >= 1; sp--) {
                     g2.setColor(new Color(0xC8, 0xA0, 0x28, Math.max(5, 35 / sp)));
                     g2.drawString(txt, tx - sp/2, ty);
@@ -139,19 +126,16 @@ public class ArcadeVictoryFrame extends JFrame {
         titleLbl.setPreferredSize(new Dimension(900, 100));
         titleLbl.setMaximumSize(new Dimension(900, 100));
 
-        // ── Gem ────────────────────────────────────────────────
         GemPanel gem = new GemPanel();
         gem.setAlignmentX(Component.CENTER_ALIGNMENT);
         gem.setPreferredSize(new Dimension(140, 140));
         gem.setMaximumSize(new Dimension(140, 140));
 
-        // ── Winner line ────────────────────────────────────────
         JLabel winnerLbl = new JLabel(winner.getName() + " conquered the Tower of Trials!", SwingConstants.CENTER);
         winnerLbl.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 21));
         winnerLbl.setForeground(new Color(0xFF, 0xF5, 0xDC));
         winnerLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // ── Typewriter lore ────────────────────────────────────
         loreLabel = new JLabel("", SwingConstants.CENTER);
         loreLabel.setFont(new Font("Serif", Font.ITALIC, 16));
         loreLabel.setForeground(new Color(0xC8, 0xA0, 0x28));
@@ -162,16 +146,27 @@ public class ArcadeVictoryFrame extends JFrame {
         dotLabel.setForeground(new Color(0xC8, 0xA0, 0x28, 180));
         dotLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // ── Trophy note ────────────────────────────────────────
         JLabel trophyNote = new JLabel("✦  A trophy now rests on the Main Menu  ✦", SwingConstants.CENTER);
         trophyNote.setFont(new Font("Serif", Font.ITALIC, 12));
         trophyNote.setForeground(new Color(0xA0, 0x88, 0x50));
         trophyNote.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // ── Return button ──────────────────────────────────────
-        JButton returnBtn = makeGoldButton("Return to Main Menu");
+        JButton returnBtn = makeGoldButton("Claim Trophy & Record Stats");
         returnBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        returnBtn.addActionListener(e -> { dispose(); new MainMenuFrame(); });
+        returnBtn.addActionListener(e -> {
+            String tag = promptForTag();
+            if (tag != null) {
+                encantadia.battle.arcade.DatabaseManager.getInstance().saveRecord(
+                        tag,
+                        300,   // TODO: replace with actual time
+                        15000, // TODO: replace with actual damage dealt
+                        8000,  // TODO: replace with actual damage received
+                        true
+                );
+                dispose();
+                new LeaderboardFrame();
+            }
+        });
 
         panel.add(titleLbl);
         panel.add(Box.createVerticalStrut(10));
@@ -191,7 +186,24 @@ public class ArcadeVictoryFrame extends JFrame {
         return panel;
     }
 
-    // ── Typewriter ────────────────────────────────────────────
+    public String promptForTag() {
+        while (true) {
+            String tag = JOptionPane.showInputDialog(this, "Enter 3-Letter Player Tag:", "Record Stats", JOptionPane.PLAIN_MESSAGE);
+            if (tag == null) return null;
+            tag = tag.trim().toUpperCase();
+
+            if (tag.length() != 3 || !tag.matches("[A-Z]{3}")) {
+                JOptionPane.showMessageDialog(this, "Tag must be EXACTLY 3 letters (A-Z).", "Invalid Input", JOptionPane.ERROR_MESSAGE);
+                continue;
+            }
+            if (encantadia.battle.arcade.DatabaseManager.getInstance().isNameTaken(tag)) {
+                JOptionPane.showMessageDialog(this, "Tag '" + tag + "' is already taken! Choose another.", "Duplicate Tag", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+            return tag;
+        }
+    }
+
     private void startTypewriter() {
         loreLineIdx  = 0;
         loreCharIdx  = 0;
@@ -205,7 +217,7 @@ public class ArcadeVictoryFrame extends JFrame {
         }
         String line = LORE_LINES[loreLineIdx];
         loreCharIdx = 0;
-        dotLabel.setText("▌"); // blinking caret
+        dotLabel.setText("▌");
 
         typeTimer = new Timer(38, ev -> {
             if (loreCharIdx <= line.length()) {
@@ -228,7 +240,6 @@ public class ArcadeVictoryFrame extends JFrame {
         typeTimer.start();
     }
 
-    // ── Animated gem ─────────────────────────────────────────
     private class GemPanel extends JPanel {
         GemPanel() { setOpaque(false); }
         @Override protected void paintComponent(Graphics g) {
@@ -240,7 +251,6 @@ public class ArcadeVictoryFrame extends JFrame {
             int cx = W/2, cy = H/2;
             float pulse = (float)(0.84 + 0.16 * Math.sin(tick * 1.7));
             int sz = (int)(Math.min(W, H) * 0.38 * pulse);
-            // Slow spin
             double angle = tick * 0.25;
             double cos = Math.cos(angle), sin = Math.sin(angle);
 
@@ -253,20 +263,16 @@ public class ArcadeVictoryFrame extends JFrame {
                     cy + (int)(0*sin + sz*cos),    cy + (int)((-sz)*sin + 0*cos)
             };
 
-            // Glow rings
             for (int ring = 9; ring >= 1; ring--) {
                 g2.setColor(new Color(0xC8, 0xA0, 0x28, Math.min(255, 16*(10-ring))));
                 g2.setStroke(new BasicStroke(ring * 2.2f));
                 g2.drawPolygon(xs, ys, 4);
             }
-            // Fill
             g2.setPaint(new GradientPaint(cx-sz, cy-sz, new Color(0xFF, 0xEE, 0x44), cx+sz, cy+sz, new Color(0xFF, 0x88, 0x00)));
             g2.fillPolygon(xs, ys, 4);
-            // Shine
             g2.setColor(new Color(255, 255, 255, 110));
             g2.setStroke(new BasicStroke(2f));
             g2.drawLine(cx - sz/3, cy - sz/2, cx + sz/4, cy - sz/5);
-            // Border
             g2.setColor(new Color(0xC8, 0xA0, 0x28));
             g2.setStroke(new BasicStroke(2f));
             g2.drawPolygon(xs, ys, 4);
@@ -274,7 +280,6 @@ public class ArcadeVictoryFrame extends JFrame {
         }
     }
 
-    // ── Animated background ───────────────────────────────────
     private class VictoryBgPanel extends JPanel {
         private final Image bg;
         private float time = 0f;
@@ -325,7 +330,6 @@ public class ArcadeVictoryFrame extends JFrame {
                 float alpha = (float)(0.20 + 0.25 * Math.sin(phase * 1.2));
                 float sz    = (float)(1.2 + maxSz * Math.abs(Math.sin(phase * 0.9)));
 
-                // CRITICAL FIX: Math.max clamps the lowest possible alpha value to 0
                 int finalAlpha = Math.max(0, Math.min(255, (int)(alpha * maxAlpha)));
 
                 g2.setColor(new Color(0xC8, 0xA0, 0x28, finalAlpha));
@@ -334,7 +338,6 @@ public class ArcadeVictoryFrame extends JFrame {
         }
     }
 
-    // ── Gold button ───────────────────────────────────────────
     private JButton makeGoldButton(String text) {
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
