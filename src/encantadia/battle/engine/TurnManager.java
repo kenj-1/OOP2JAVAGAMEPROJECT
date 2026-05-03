@@ -74,6 +74,8 @@ public class TurnManager {
 
         target.takeDamage(damage);
         result.totalDamageDealt(damage);
+        result.log("⚔  " + attacker.getName() + " uses " + skill.getName()
+                + " on " + target.getName() + "  →  " + damage + " dmg");  // ADD THIS
 
         if (skill.getEffectType() != Skill.EffectType.NONE && skill.effectTriggered()) {
             applyEffect(attacker, target, skill, damage, result);
@@ -102,6 +104,8 @@ public class TurnManager {
 
         healer.heal(amount);
         result.totalHealApplied(amount);
+        result.log("💚  " + healer.getName() + " uses " + skill.getName()
+                + "  →  +" + amount + " HP restored");  // ADD THIS
 
         cooldownManager.setCooldown(healer, index, skill.getCooldown());
     }
@@ -118,7 +122,7 @@ public class TurnManager {
 
                 target.takeDamage(bonus);
                 result.extraDamage(bonus);
-                result.log("🔥 Extra damage dealt!");
+                result.log("🔥  Bonus hit!  " + bonus + " extra damage");
             }
 
             case TURN_STEAL -> {
@@ -152,9 +156,8 @@ public class TurnManager {
             case RECOIL -> {
                 int recoil = (int) (damage * skill.getEffectValue());
                 attacker.takeDamage(recoil);
-
                 result.recoilDamage(recoil);
-                result.log("💢 Recoil damage taken!");
+                result.log("💢  " + attacker.getName() + " suffers " + recoil + " recoil damage");
 
                 addEffect(new StatusEffect(
                         Skill.EffectType.DAMAGE_REDUCTION,
@@ -167,7 +170,7 @@ public class TurnManager {
                 int heal = (int) skill.getEffectValue();
                 attacker.heal(heal);
                 result.totalHealApplied(heal);
-                result.log("💚 Healing effect triggered!");
+                result.log("💚  +" + heal + " HP from skill effect");
             }
         }
     }

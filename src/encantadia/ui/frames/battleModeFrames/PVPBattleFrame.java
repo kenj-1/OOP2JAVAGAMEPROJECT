@@ -707,12 +707,18 @@ public class PVPBattleFrame extends JFrame {
             g2.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, Math.max(10, (int) (13 * sc)))); FontMetrics fm = g2.getFontMetrics(); drawShadow(g2, tt, (W - fm.stringWidth(tt)) / 2, tabY + tabH + (int) (4 * sc), GOLD);
 
             // ── ACTIVE SPRITE ZONE ──
+            // ── NEW ──
             int groundY    = H - (int)(170 * sc);
-            int spriteSize = (int)(220 * sc);
+            int spriteSize = Math.min((int)(220 * sc), (int)(H * 0.42));
+            spriteSize     = Math.max(spriteSize, 120);
 
-            // Apply Kinetic Knockback Offset
-            int p1SpriteX = (int)(W * 0.15) - (p1Animator != null ? p1Animator.getKnockbackOffset() : 0);
-            int p2SpriteX = (int)(W * 0.85) - spriteSize + (p2Animator != null ? p2Animator.getKnockbackOffset() : 0);
+            int cx         = W / 2;
+            int charOffset = (int)(250 * sc);
+
+            int p1SpriteX = cx - charOffset - spriteSize / 2
+                    - (p1Animator != null ? p1Animator.getKnockbackOffset() : 0);
+            int p2SpriteX = cx + charOffset - spriteSize / 2
+                    + (p2Animator != null ? p2Animator.getKnockbackOffset() : 0);
 
             // P1 Render
             if (p1Animator != null) {
@@ -728,10 +734,11 @@ public class PVPBattleFrame extends JFrame {
             }
 
             // P2 Render (Mirrored)
+            // P2 Render (Mirrored)
             if (p2Animator != null) {
                 AffineTransform oldTransform = g2.getTransform();
-                int cx = p2SpriteX + spriteSize / 2;
-                g2.translate(cx, 0); g2.scale(-1, 1); g2.translate(-cx, 0);
+                int mirrorCx = p2SpriteX + spriteSize / 2;
+                g2.translate(mirrorCx, 0); g2.scale(-1, 1); g2.translate(-mirrorCx, 0);
                 p2Animator.draw(g2, p2SpriteX, groundY - spriteSize, spriteSize, spriteSize, this);
                 g2.setTransform(oldTransform);
             }
@@ -891,7 +898,25 @@ public class PVPBattleFrame extends JFrame {
     private Image loadImage(String path){ if(path==null) return null;URL url=getClass().getResource(path);if(url==null){System.err.println("Missing: "+path);return null;}return new ImageIcon(url).getImage(); }
     private JButton makeGoldOverlayButton(String text) { JButton btn = new JButton(text) { @Override protected void paintComponent(Graphics g) { Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);boolean h=getModel().isRollover();g2.setPaint(new GradientPaint(0,0,h?new Color(170,110,40):new Color(120,70,20),0,getHeight(),h?new Color(120,80,30):new Color(80,40,10)));g2.fillRoundRect(0,0,getWidth(),getHeight(),14,14);if(h){g2.setColor(new Color(255,215,120,80));g2.setStroke(new BasicStroke(2.5f));g2.drawRoundRect(2,2,getWidth()-4,getHeight()-4,14,14);}g2.setColor(new Color(220,180,90));g2.setStroke(new BasicStroke(1.5f));g2.drawRoundRect(1,1,getWidth()-2,getHeight()-2,14,14);g2.setFont(new Font("Serif",Font.BOLD,14));FontMetrics fm=g2.getFontMetrics();int tx=(getWidth()-fm.stringWidth(getText()))/2,ty=(getHeight()+fm.getAscent())/2-2;g2.setColor(Color.BLACK);g2.drawString(getText(),tx+1,ty+1);g2.setColor(new Color(255,230,170));g2.drawString(getText(),tx,ty);g2.dispose(); } }; btn.setOpaque(false);btn.setContentAreaFilled(false);btn.setBorderPainted(false);btn.setFocusPainted(false);btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));btn.setPreferredSize(new Dimension(200,46)); return btn; }
 
-    private class BgPanel extends JPanel{ private final Image img; BgPanel(String p){img=loadImage(p);setOpaque(true);setBackground(Color.BLACK);} @Override protected void paintComponent(Graphics g){super.paintComponent(g);if(img!=null){Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);drawImageFill(g2, img, 0, 0, getWidth(), getHeight());g2.dispose();}} }
+    private class BgPanel extends JPanel {
+        private final Image img;
+        BgPanel(String p) { img = loadImage(p); setOpaque(true); setBackground(Color.BLACK); }
+        @Override protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (img != null) {
+                int iw = img.getWidth(null), ih = img.getHeight(null);
+                if (iw <= 0 || ih <= 0) return;
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                double scale = Math.max((double) getWidth() / iw, (double) getHeight() / ih);
+                int dw = (int)(iw * scale), dh = (int)(ih * scale);
+                int dx = (getWidth() - dw) / 2;
+                int dy = getHeight() - dh;
+                g2.drawImage(img, dx, dy, dw, dh, null);
+                g2.dispose();
+            }
+        }
+    }
     private class ScaledImgPanel extends JPanel{ private final Image img; ScaledImgPanel(String p){img=loadImage(p);setOpaque(false);} @Override protected void paintComponent(Graphics g){super.paintComponent(g);if(img==null) return;Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);drawImageProportional(g2, img, 0, 0, getWidth(), getHeight());g2.dispose();} }
 
     private class PlayerBanner extends JPanel{ PlayerBanner(){setOpaque(false);} @Override protected void paintComponent(Graphics g){super.paintComponent(g);Graphics2D g2=(Graphics2D)g.create();g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,RenderingHints.VALUE_TEXT_ANTIALIAS_ON);int W=getWidth(),H=getHeight();g2.setColor(new Color(0x0A,0x06,0x02,200));g2.fillRoundRect(W/8,2,W*6/8,H-4,12,12);g2.setStroke(new BasicStroke(1.5f));g2.setColor(new Color(0xC8,0xA0,0x28,180));g2.drawRoundRect(W/8,2,W*6/8,H-4,12,12);g2.setFont(new Font("Serif",Font.BOLD|Font.ITALIC,Math.max(14,H/2)));FontMetrics fm=g2.getFontMetrics();String main="\u2726  The Second Warrior Rises  \u2726";g2.setColor(new Color(0,0,0,120));g2.drawString(main,(W-fm.stringWidth(main))/2+1,H/2);g2.setColor(new Color(0x80,0xC4,0xFF));g2.drawString(main,(W-fm.stringWidth(main))/2,H/2-1);g2.setFont(new Font("Serif",Font.ITALIC,Math.max(10,H/3)));fm=g2.getFontMetrics();String sub="Player 2 \u2014 step forth and claim your element";g2.setColor(new Color(0xD4,0xC5,0xA0,200));g2.drawString(sub,(W-fm.stringWidth(sub))/2,H-4);g2.dispose();} }

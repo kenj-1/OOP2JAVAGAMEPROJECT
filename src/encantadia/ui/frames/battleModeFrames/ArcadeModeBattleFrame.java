@@ -937,10 +937,14 @@ public class ArcadeModeBattleFrame extends JFrame {
             drawShadow(g2,tt,(W-fm.stringWidth(tt))/2,hudBottomY+(int)(4*sc),GOLD);
 
             int groundY    = H - (int)(170 * sc);
-            int spriteSize = (int)(220 * sc);
+            int spriteSize = Math.min((int)(220 * sc), (int)(H * 0.42));
+            spriteSize     = Math.max(spriteSize, 120);
 
-            int p1SpriteX = (int)(W * 0.15) - (playerAnimator != null ? playerAnimator.getKnockbackOffset() : 0);
-            int p2SpriteX = (int)(W * 0.85) - spriteSize + (enemyAnimator != null ? enemyAnimator.getKnockbackOffset() : 0);
+            int cx         = W / 2;
+            int charOffset = (int)(250 * sc); // calibrated from default 1024×768 layout
+
+            int p1SpriteX = cx - charOffset - spriteSize / 2
+                    - (playerAnimator != null ? playerAnimator.getKnockbackOffset() : 0);
 
             if (isSummoning && assistAnimator != null) {
                 Shape savedClip = g2.getClip();
@@ -960,15 +964,16 @@ public class ArcadeModeBattleFrame extends JFrame {
             }
 
             int eSize = isBoss ? (int)(spriteSize * 1.45) : spriteSize;
-            int eX    = (int)(W * 0.85) - eSize + (enemyAnimator != null ? enemyAnimator.getKnockbackOffset() : 0);
+            int eX    = cx + charOffset - eSize / 2
+                    + (enemyAnimator != null ? enemyAnimator.getKnockbackOffset() : 0);
             int eY    = groundY - eSize;
 
             if (isBoss) drawBossAura(g2, eX + eSize/2, eY + eSize/2, eSize);
 
             if (enemyAnimator != null) {
                 AffineTransform oldTransform = g2.getTransform();
-                int cx = eX + eSize / 2;
-                g2.translate(cx, 0); g2.scale(-1, 1); g2.translate(-cx, 0);
+                int mirrorCx = eX + eSize / 2;
+                g2.translate(mirrorCx, 0); g2.scale(-1, 1); g2.translate(-mirrorCx, 0);
                 enemyAnimator.draw(g2, eX, eY, eSize, eSize, this);
                 g2.setTransform(oldTransform);
             }
@@ -1222,9 +1227,15 @@ public class ArcadeModeBattleFrame extends JFrame {
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             if (img != null) {
-                Graphics2D g2=(Graphics2D)g.create();
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                drawImageFill(g2, img, 0, 0, getWidth(), getHeight());
+                int iw = img.getWidth(null), ih = img.getHeight(null);
+                if (iw <= 0 || ih <= 0) return;
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                double scale = Math.max((double) getWidth() / iw, (double) getHeight() / ih);
+                int dw = (int)(iw * scale), dh = (int)(ih * scale);
+                int dx = (getWidth() - dw) / 2;
+                int dy = getHeight() - dh;
+                g2.drawImage(img, dx, dy, dw, dh, null);
                 g2.dispose();
             }
         }
