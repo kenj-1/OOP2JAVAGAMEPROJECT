@@ -10,6 +10,8 @@ import java.util.List;
 import encantadia.ui.frames.MainMenuFrame;
 import encantadia.ScreenManager;
 import encantadia.story.StoryType;
+import encantadia.audio.MusicManager;
+import encantadia.audio.MusicType;
 
 public class WelcomeScreenPage extends JFrame {
 
@@ -94,6 +96,9 @@ public class WelcomeScreenPage extends JFrame {
         );
 
         startAnimations();
+
+        // ✅ START MENU MUSIC
+        MusicManager.play(MusicType.MENU);
     }
 
     @Override

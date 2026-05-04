@@ -26,6 +26,8 @@ public class MakelanShere extends Character {
                         "Each strike feeds his power, yet every overwhelming assault demands a price from his own flesh."
         );
 
+        this.element = Element.AIR;
+
         skills.add(new Skill("Lead Heel", 240, 320, 0,
                 Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));

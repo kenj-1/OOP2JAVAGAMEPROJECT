@@ -12,6 +12,9 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.net.URL;
 
+
+
+
 public class BackstoryShowcase extends JFrame {
 
     private static final String BG_PATH        = "/resources/background (3).png";
@@ -74,6 +77,9 @@ public class BackstoryShowcase extends JFrame {
     }
 
     public BackstoryShowcase(String[] paragraphs, String title, Runnable onFinish, Runnable onBack) {
+
+
+
         this.paragraphs = paragraphs;
         this.storyTitle = title;
         this.onFinish = onFinish;
@@ -374,8 +380,14 @@ public class BackstoryShowcase extends JFrame {
     }
 
     private void proceed() {
+
         dispose();
-        if (onFinish != null) onFinish.run();
+
+        if (onFinish != null) {
+
+
+            onFinish.run();
+        }
     }
 
     // ================= HTML =================

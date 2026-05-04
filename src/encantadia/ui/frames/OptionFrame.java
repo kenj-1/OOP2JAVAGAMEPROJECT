@@ -1,8 +1,11 @@
 package encantadia.ui.frames;
 
 import encantadia.ScreenManager;
+import encantadia.audio.MusicManager;
+import encantadia.audio.SFXManager;
 
 import javax.swing.*;
+import javax.swing.plaf.basic.BasicSliderUI;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -10,21 +13,22 @@ import java.net.URL;
 
 public class OptionFrame extends JFrame {
 
-    // FIXED: Added "/resources/" prefix to all paths
     private static final String BG_PATH       = "/resources/welcomeScreen_JAVA.png";
     private static final String HOLDER_PATH   = "/resources/optionsHolder.png";
     private static final String TITLE_PATH    = "/resources/gameTitle.png";
     private static final String BANNER_PATH   = "/resources/optionsButton (1).png";
-    private static final String VOLUME_PATH   = "/resources/adjustVolume (1).png";
-    private static final String LANGUAGE_PATH = "/resources/setLanguage (1).png";
     private static final String CANCEL_PATH   = "/resources/cancelButton.png";
 
     private ImagePanel holderPanel;
     private ImagePanel bannerPanel;
     private FloatingTitle titlePanel;
 
-    private JButton volumeButton;
-    private JButton languageButton;
+    private JLabel musicLabel;
+    private JSlider musicSlider;
+
+    private JLabel sfxLabel;
+    private JSlider sfxSlider;
+
     private JButton cancelButton;
 
     private Timer animTimer;
@@ -53,12 +57,40 @@ public class OptionFrame extends JFrame {
         bannerPanel = new ImagePanel(BANNER_PATH);
         lp.add(bannerPanel, JLayeredPane.POPUP_LAYER);
 
-        volumeButton   = makeImgButton(VOLUME_PATH);
-        languageButton = makeImgButton(LANGUAGE_PATH);
-        cancelButton   = makeImgButton(CANCEL_PATH);
-
         JPanel btnLayer = new JPanel(null);
         btnLayer.setOpaque(false);
+
+        // --- Setup Volume Sliders ---
+        Font labelFont = new Font("Serif", Font.BOLD | Font.ITALIC, 24);
+        Color labelColor = new Color(220, 180, 90);
+
+        musicLabel = new JLabel("Music Volume", SwingConstants.CENTER);
+        musicLabel.setFont(labelFont);
+        musicLabel.setForeground(labelColor);
+
+        musicSlider = new JSlider(0, 100, (int)(MusicManager.getVolume() * 100));
+        musicSlider.setOpaque(false);
+        musicSlider.setUI(new GoldSliderUI(musicSlider));
+        musicSlider.addChangeListener(e -> MusicManager.setVolume(musicSlider.getValue() / 100f));
+
+        sfxLabel = new JLabel("SFX Volume", SwingConstants.CENTER);
+        sfxLabel.setFont(labelFont);
+        sfxLabel.setForeground(labelColor);
+
+        sfxSlider = new JSlider(0, 100, (int)(SFXManager.getVolume() * 100));
+        sfxSlider.setOpaque(false);
+        sfxSlider.setUI(new GoldSliderUI(sfxSlider));
+        sfxSlider.addChangeListener(e -> SFXManager.setVolume(sfxSlider.getValue() / 100f));
+
+        cancelButton = makeImgButton(CANCEL_PATH);
+        cancelButton.addActionListener(e -> dispose());
+
+        btnLayer.add(musicLabel);
+        btnLayer.add(musicSlider);
+        btnLayer.add(sfxLabel);
+        btnLayer.add(sfxSlider);
+        btnLayer.add(cancelButton);
+
         lp.add(btnLayer, JLayeredPane.DRAG_LAYER);
 
         addComponentListener(new ComponentAdapter() {
@@ -73,11 +105,8 @@ public class OptionFrame extends JFrame {
         });
         animTimer.start();
 
-        cancelButton.addActionListener(e -> dispose());
-
         setVisible(true);
         ScreenManager.register(this);
-
         SwingUtilities.invokeLater(() -> reposition(lp, bg, btnLayer));
     }
 
@@ -93,7 +122,6 @@ public class OptionFrame extends JFrame {
         if (W == 0 || H == 0) return;
 
         bg.setBounds(0, 0, W, H);
-
         double scale = Math.min(W / 1024.0, H / 768.0);
 
         // TITLE
@@ -117,31 +145,32 @@ public class OptionFrame extends JFrame {
         int bannerY = holderY - (bannerH / 3);
         bannerPanel.setBounds(bannerX, bannerY, bannerW, bannerH);
 
-        // BUTTONS
-        int qW = (int)(holderW * 0.80);
-        int qH = (int)(holderH * 0.30);
-        int centerX = holderX + (holderW - qW) / 2;
-        int shiftLeft = (int)(holderW * 0.10);
-        int qX = centerX - shiftLeft;
-        int startY = holderY + (int)(holderH * 0.15);
+        // SLIDER LAYOUT
+        int sliderW = (int)(holderW * 0.70);
+        int sliderH = 40;
+        int labelH  = 30;
+        int centerX = holderX + (holderW - sliderW) / 2;
 
-        volumeButton.setBounds(qX, startY, qW, qH);
-        languageButton.setBounds(qX, startY + qH, qW, qH);
+        int currentY = holderY + (int)(holderH * 0.15);
+
+        musicLabel.setBounds(centerX, currentY, sliderW, labelH);
+        currentY += labelH;
+        musicSlider.setBounds(centerX, currentY, sliderW, sliderH);
+        currentY += sliderH + (int)(10 * scale); // gap
+
+        sfxLabel.setBounds(centerX, currentY, sliderW, labelH);
+        currentY += labelH;
+        sfxSlider.setBounds(centerX, currentY, sliderW, sliderH);
 
         // CANCEL BUTTON
         int btnH = (int)(60 * scale);
         int cancelW = (int)(btnH * 3.0);
         int cancelX = holderX + (holderW - cancelW) / 2;
-        int cancelY = holderY + (int)(holderH * 0.72);
+        int cancelY = holderY + (int)(holderH * 0.75);
 
         cancelButton.setBounds(cancelX, cancelY, cancelW, btnH);
 
-        btnLayer.removeAll();
         btnLayer.setBounds(0, 0, W, H);
-        btnLayer.add(volumeButton);
-        btnLayer.add(languageButton);
-        btnLayer.add(cancelButton);
-
         pane.revalidate();
         pane.repaint();
     }
@@ -155,7 +184,7 @@ public class OptionFrame extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
                 double s = Math.min((double)getWidth()/img.getWidth(null), (double)getHeight()/img.getHeight(null));
-                if (getModel().isRollover()) s *= 1.05; // Gentle hover scale
+                if (getModel().isRollover()) s *= 1.05;
 
                 int dw = (int)(img.getWidth(null) * s);
                 int dh = (int)(img.getHeight(null) * s);
@@ -174,6 +203,42 @@ public class OptionFrame extends JFrame {
         URL url = getClass().getResource(path);
         if (url == null) { System.err.println("Missing: " + path); return null; }
         return new ImageIcon(url).getImage();
+    }
+
+    // ── Themed Golden Slider UI ──
+    private class GoldSliderUI extends BasicSliderUI {
+        public GoldSliderUI(JSlider b) { super(b); }
+
+        @Override
+        public void paintTrack(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // Dark track background
+            g2.setColor(new Color(20, 15, 10, 200));
+            g2.fillRoundRect(trackRect.x, trackRect.y + trackRect.height/2 - 4, trackRect.width, 8, 8, 8);
+
+            // Filled golden portion
+            int fillWidth = thumbRect.x - trackRect.x;
+            g2.setColor(new Color(200, 160, 40));
+            g2.fillRoundRect(trackRect.x, trackRect.y + trackRect.height/2 - 4, fillWidth, 8, 8, 8);
+        }
+
+        @Override
+        public void paintThumb(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int thumbRadius = 20;
+            int ty = thumbRect.y + thumbRect.height/2 - thumbRadius/2;
+
+            g2.setColor(new Color(255, 215, 100)); // Bright Gold Center
+            g2.fillOval(thumbRect.x, ty, thumbRadius, thumbRadius);
+
+            g2.setColor(new Color(150, 100, 20)); // Dark Gold Ring
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawOval(thumbRect.x, ty, thumbRadius, thumbRadius);
+        }
     }
 
     protected void drawImageFill(Graphics2D g2, Image img, int x, int y, int w, int h) {

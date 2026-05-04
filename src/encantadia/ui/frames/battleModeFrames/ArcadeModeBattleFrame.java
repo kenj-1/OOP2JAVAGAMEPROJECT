@@ -24,6 +24,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import encantadia.audio.MusicManager;
+import encantadia.audio.MusicType;
+import encantadia.audio.SFXManager;
+
 public class ArcadeModeBattleFrame extends JFrame {
 
     private javax.swing.Timer turnCountdownTimer;
@@ -41,12 +45,7 @@ public class ArcadeModeBattleFrame extends JFrame {
     private CharacterAnimator assistAnimator   = null;
     private int[]             assistDurations  = new int[]{1600};
 
-    private static final String[] FRAME_IMGS = {
-            "/resources/tyroneFrame (1).png", "/resources/elanFrame (1).png",
-            "/resources/claireFrame (1).png", "/resources/dirkFrame (1).png",
-            "/resources/flamaraFrame (1).png", "/resources/deaFrame (1).png",
-            "/resources/adamusFrame (1).png",  "/resources/teraFrame (1).png"
-    };
+    private static final String[] FRAME_IMGS = { "/resources/TyroneFrame.png", "/resources/ElanFrame.png", "/resources/ClaireFrame.png", "/resources/DirkFrame.png", "/resources/FlamaraFrame1.png", "/resources/DeaFrame1.png", "/resources/AdamusFrame1.png",  "/resources/TeraFrame1.png" };
 
     private static final String[] CHAR_NAMES = {
             "Tyrone", "Makelan Shere", "Claire", "Dirk", "Flamara", "Dea", "Adamus", "Tera"
@@ -89,13 +88,16 @@ public class ArcadeModeBattleFrame extends JFrame {
         this.enemyCharacter  = manager.getCurrentEnemy();
 
         if (enemyCharacter == null) {
-            SwingUtilities.invokeLater(() -> new ArcadeVictoryFrame(player));
+            SwingUtilities.invokeLater(() -> new ArcadeVictoryFrame(player, manager));
             return;
         }
 
         playerCharacter.reset();
         enemyCharacter.reset();
         this.turnManager = new TurnManager(playerCharacter, enemyCharacter);
+
+        MusicManager.stop();
+        new javax.swing.Timer(200, e -> { MusicManager.playWithDelay(MusicType.BATTLE, 300); }) {{ setRepeats(false); start(); }};
 
         this.playerAnimator = CharacterAnimator.forCharacter(playerCharacter);
         this.enemyAnimator  = CharacterAnimator.forCharacter(enemyCharacter);
@@ -301,6 +303,11 @@ public class ArcadeModeBattleFrame extends JFrame {
         Timer impactTimer = new Timer(impactDelay, e -> {
             ((Timer)e.getSource()).stop();
             TurnResult res = turnManager.executeSkill(playerCharacter, enemyCharacter, si);
+
+            // 📈 TRACK REAL-TIME DAMAGE
+            arcadeManager.addDamageDealt(res.getTotalDamageDealt() + res.getExtraDamage());
+            arcadeManager.addDamageReceived(res.getRecoilDamage());
+
             flushResult(res);
 
             enemyFlashAlpha = 1.0f;
@@ -344,6 +351,11 @@ public class ArcadeModeBattleFrame extends JFrame {
                 Timer impactTimer = new Timer(impactDelay, e -> {
                     ((Timer)e.getSource()).stop();
                     TurnResult res = turnManager.executeSkill(playerCharacter, enemyCharacter, si);
+
+                    // 📈 TRACK REAL-TIME DAMAGE
+                    arcadeManager.addDamageDealt(res.getTotalDamageDealt() + res.getExtraDamage());
+                    arcadeManager.addDamageReceived(res.getRecoilDamage());
+
                     flushResult(res);
 
                     enemyFlashAlpha = 1.0f;
@@ -372,6 +384,11 @@ public class ArcadeModeBattleFrame extends JFrame {
             entrance.setRepeats(false); entrance.start();
         } else {
             TurnResult res = turnManager.executeSkill(playerCharacter, enemyCharacter, si);
+
+            // 📈 TRACK REAL-TIME DAMAGE
+            arcadeManager.addDamageDealt(res.getTotalDamageDealt() + res.getExtraDamage());
+            arcadeManager.addDamageReceived(res.getRecoilDamage());
+
             flushResult(res);
             isSummoning = false;
             turnManager.advanceTurn(); updateTurnState(); processingTurn = false;
@@ -392,6 +409,11 @@ public class ArcadeModeBattleFrame extends JFrame {
         Timer impactTimer = new Timer(impactDelay, e -> {
             ((Timer)e.getSource()).stop();
             TurnResult res = turnManager.executeSkill(enemyCharacter, playerCharacter, si);
+
+            // 📈 TRACK REAL-TIME DAMAGE
+            arcadeManager.addDamageReceived(res.getTotalDamageDealt() + res.getExtraDamage());
+            arcadeManager.addDamageDealt(res.getRecoilDamage()); // Enemy recoil counts as player dealing damage
+
             flushResult(res);
 
             playerFlashAlpha = 1.0f;
@@ -436,6 +458,10 @@ public class ArcadeModeBattleFrame extends JFrame {
         if (playerAnimator != null) playerAnimator.toIdle();
         if (enemyAnimator != null) enemyAnimator.dispose();
 
+        // 🎵 STRICT STOP PROTOCOL ON TRANSITION
+        MusicManager.stop();
+        SFXManager.stopAll();
+
         log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log("🏆  " + playerCharacter.getName() + " defeated " + enemyCharacter.getName() + "!");
         arcadeManager.recordVictory();
@@ -447,7 +473,7 @@ public class ArcadeModeBattleFrame extends JFrame {
     }
 
     private void processVictoryOutcome() {
-        if (arcadeManager.isFinished()) { dispose(); new ArcadeVictoryFrame(playerCharacter); return; }
+        if (arcadeManager.isFinished()) { dispose(); new ArcadeVictoryFrame(playerCharacter, arcadeManager); return; }
 
         if (arcadeManager.shouldGiveHPBoost() || arcadeManager.shouldGiveUltimate()) {
             playRewardSequence(() -> {
@@ -645,6 +671,11 @@ public class ArcadeModeBattleFrame extends JFrame {
         if (playerAnimator != null) playerAnimator.dispose();
         if (enemyAnimator != null) enemyAnimator.toIdle();
 
+        // 🎵 STRICT STOP PROTOCOL ON TRANSITION
+        arcadeManager.markEndTime(); // Stop timer now
+        MusicManager.stop();
+        SFXManager.stopAll();
+
         log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         log("💀  " + enemyCharacter.getName() + " has defeated you!");
 
@@ -691,13 +722,14 @@ public class ArcadeModeBattleFrame extends JFrame {
     }
 
     private void processSurrender() {
-        String tag = promptForTag();
+        String tag = showThemedTagDialog();
         if (tag != null) {
+            // 📈 FETCH REAL-TIME STATS
             DatabaseManager.getInstance().saveRecord(
                     tag,
-                    120,   // TODO: replace with actual time
-                    5000,  // TODO: replace with actual damage dealt
-                    4000,  // TODO: replace with actual damage received
+                    arcadeManager.getTotalTimeSeconds(),
+                    arcadeManager.getTotalDamageDealt(),
+                    arcadeManager.getTotalDamageReceived(),
                     false
             );
             dispose();
@@ -705,22 +737,105 @@ public class ArcadeModeBattleFrame extends JFrame {
         }
     }
 
-    public String promptForTag() {
-        while (true) {
-            String tag = JOptionPane.showInputDialog(this, "Enter 3-Letter Player Tag:", "Record Stats", JOptionPane.PLAIN_MESSAGE);
-            if (tag == null) return null;
-            tag = tag.trim().toUpperCase();
+    private String showThemedTagDialog() {
+        JDialog dialog = new JDialog(this, "Record Stats", true);
+        dialog.setUndecorated(true);
+        dialog.setSize(400, 230);
+        dialog.setLocationRelativeTo(this);
 
-            if (tag.length() != 3 || !tag.matches("[A-Z]{3}")) {
-                JOptionPane.showMessageDialog(this, "Tag must be EXACTLY 3 letters (A-Z).", "Invalid Input", JOptionPane.ERROR_MESSAGE);
-                continue;
+        JPanel panel = new JPanel(null) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(20, 15, 10, 240));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
+                g2.setColor(new Color(200, 160, 40));
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 16, 16);
+                g2.dispose();
             }
-            if (DatabaseManager.getInstance().isNameTaken(tag)) {
-                JOptionPane.showMessageDialog(this, "Tag '" + tag + "' is already taken! Choose another.", "Duplicate Tag", JOptionPane.WARNING_MESSAGE);
-                continue;
+        };
+        dialog.setContentPane(panel);
+        panel.setOpaque(false);
+
+        JLabel title = new JLabel("RECORD YOUR LEGACY", SwingConstants.CENTER);
+        title.setFont(new Font("Serif", Font.BOLD, 18));
+        title.setForeground(new Color(220, 180, 60));
+        title.setBounds(0, 20, 400, 30);
+        panel.add(title);
+
+        JLabel prompt = new JLabel("Enter 3-Letter Player Tag:", SwingConstants.CENTER);
+        prompt.setFont(new Font("Serif", Font.ITALIC, 14));
+        prompt.setForeground(new Color(200, 200, 200));
+        prompt.setBounds(0, 50, 400, 20);
+        panel.add(prompt);
+
+        JTextField input = new JTextField();
+        input.setBounds(150, 80, 100, 40);
+        input.setFont(new Font("Monospaced", Font.BOLD, 24));
+        input.setHorizontalAlignment(JTextField.CENTER);
+        input.setBackground(new Color(30, 20, 15));
+        input.setForeground(Color.WHITE);
+        input.setCaretColor(new Color(200, 160, 40));
+        input.setBorder(BorderFactory.createLineBorder(new Color(200, 160, 40)));
+        panel.add(input);
+
+        JLabel error = new JLabel("", SwingConstants.CENTER);
+        error.setFont(new Font("SansSerif", Font.BOLD, 11));
+        error.setForeground(new Color(255, 80, 80));
+        error.setBounds(0, 130, 400, 20);
+        panel.add(error);
+
+        String[] result = new String[1];
+
+        JButton submit = makeDialogButton("Submit");
+        submit.setBounds(60, 165, 120, 40);
+        submit.addActionListener(e -> {
+            String txt = input.getText().trim().toUpperCase();
+            if (txt.length() != 3 || !txt.matches("[A-Z]{3}")) {
+                error.setText("Tag must be exactly 3 letters (A-Z).");
+            } else if (encantadia.battle.arcade.DatabaseManager.getInstance().isNameTaken(txt)) {
+                error.setText("Tag '" + txt + "' is taken! Choose another.");
+            } else {
+                result[0] = txt;
+                dialog.dispose();
             }
-            return tag;
-        }
+        });
+
+        JButton cancel = new JButton("Skip");
+        cancel.setForeground(new Color(150, 150, 150));
+        cancel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        cancel.setContentAreaFilled(false);
+        cancel.setBorderPainted(false);
+        cancel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        cancel.setBounds(220, 165, 120, 40);
+        cancel.addActionListener(e -> dialog.dispose());
+
+        panel.add(submit);
+        panel.add(cancel);
+
+        dialog.setBackground(new Color(0, 0, 0, 0));
+        dialog.setVisible(true); // Blocks execution here until closed
+        return result[0];
+    }
+
+    private JButton makeDialogButton(String text) {
+        JButton btn = new JButton(text) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean h = getModel().isRollover();
+                g2.setPaint(new GradientPaint(0, 0, h ? new Color(170, 110, 40) : new Color(120, 70, 20), 0, getHeight(), h ? new Color(120, 80, 30) : new Color(80, 40, 10)));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.setColor(new Color(220, 180, 90)); g2.setStroke(new BasicStroke(1.5f)); g2.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 8, 8);
+                g2.setFont(new Font("Serif", Font.BOLD, 14)); FontMetrics fm = g2.getFontMetrics();
+                int tx = (getWidth()-fm.stringWidth(getText()))/2, ty = (getHeight()+fm.getAscent())/2 - 2;
+                g2.setColor(Color.BLACK); g2.drawString(getText(), tx+1, ty+1); g2.setColor(new Color(255, 230, 170)); g2.drawString(getText(), tx, ty);
+                g2.dispose();
+            }
+        };
+        btn.setOpaque(false); btn.setContentAreaFilled(false); btn.setBorderPainted(false); btn.setFocusPainted(false); btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
     }
 
     // ── Timers ────────────────────────────────────────────────
@@ -841,6 +956,25 @@ public class ArcadeModeBattleFrame extends JFrame {
         double scale = Math.min((double) w / iw, (double) h / ih); int dw = (int) (iw * scale), dh = (int) (ih * scale); g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
     }
 
+    protected void drawImageCover(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return;
+
+        int iw = img.getWidth(null);
+        int ih = img.getHeight(null);
+        if (iw <= 0 || ih <= 0) return;
+
+        double scale = Math.max((double) w / iw,
+                (double) h / ih);
+
+        int dw = (int)(iw * scale);
+        int dh = (int)(ih * scale);
+
+        int dx = x + (w - dw) / 2;
+        int dy = y + (h - dh) / 2;
+
+        g2.drawImage(img, dx, dy, dw, dh, null);
+    }
+
     private void registerHotkeys() {
         JComponent root = (JComponent) getContentPane();
         InputMap im = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
@@ -905,7 +1039,7 @@ public class ArcadeModeBattleFrame extends JFrame {
 
             drawFlankingTimers(g2, W, tabX, tabY, tabW, tabH, sc);
 
-            int portW=(int)(82*sc),portH=(int)(82*sc),hpW=(int)(230*sc),hpH=(int)(16*sc);
+            int portW=(int)(130*sc), portH=(int)(120*sc),hpW=(int)(230*sc),hpH=(int)(16*sc);
             int pillW=(int)(140*sc),pillH=(int)(24*sc),portY = hudBottomY + (int)(8*sc);
 
             int ppx=(int)(10*sc);
@@ -1091,9 +1225,7 @@ public class ArcadeModeBattleFrame extends JFrame {
             g2.setColor(new Color(0x08,0x05,0x02,210));
             g2.fillRoundRect(x,y,w,h,8,8);
             if (img != null) {
-                double scale = Math.min((double) w / img.getWidth(null), (double) h / img.getHeight(null));
-                int dw = (int) (img.getWidth(null) * scale), dh = (int) (img.getHeight(null) * scale);
-                g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
+                drawImageCover(g2, img, x, y, w, h);
             }
             g2.setStroke(new BasicStroke(2));
             g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),active?220:90));

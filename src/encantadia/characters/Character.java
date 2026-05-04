@@ -5,17 +5,11 @@ import encantadia.battle.skill.Skill;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Abstract base for every playable and enemy character.
- *
- * Animation contract (optional override)
- * ─────────────────────────────────────
- * Subclasses that have sprite GIFs should override the three animation methods
- * below.  The default implementations return null / empty, which signals to
- * {@code CharacterAnimator.forCharacter()} that no animator should be created,
- * so the battle frames fall back gracefully to their static portrait images.
- */
 public abstract class Character {
+
+    // --- Elemental Classification ---
+    public enum Element { FIRE, WATER, EARTH, AIR, NONE }
+    protected Element element = Element.NONE;
 
     protected String name;
     protected String title;
@@ -35,61 +29,18 @@ public abstract class Character {
         this.skills    = new ArrayList<>();
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  Animation hooks  (override in subclasses with GIF assets)
-    // ══════════════════════════════════════════════════════════
+    // --- Animation & Audio Hooks ---
+    public String getIdleAnimationPath() { return null; }
+    public String[] getSkillAnimationPaths() { return null; }
+    public int[] getSkillAnimationDurations() { return null; }
 
-    /**
-     * Classpath path for the character's looping idle GIF.
-     * Return {@code null} (default) if no idle animation is available.
-     *
-     * Example: {@code return "/resources/claire_idle.gif";}
-     */
-    public String getIdleAnimationPath() {
-        return null;
-    }
-
-    /**
-     * Classpath paths for each skill animation GIF, index-aligned with
-     * {@link #getSkills()}.  Return {@code null} (default) if no skill
-     * animations are available.
-     *
-     * Example: {@code return new String[]{
-     *     "/resources/Claire skill 1 384x96.gif",
-     *     "/resources/claire skill 2 384x96.gif",
-     *     "/resources/claire skill 3 384x96.gif"
-     * };}
-     */
-    public String[] getSkillAnimationPaths() {
-        return null;
-    }
-
-    /**
-     * Playback durations in milliseconds for each skill GIF, index-aligned
-     * with {@link #getSkillAnimationPaths()}.
-     * These values are used by {@code CharacterAnimator} to schedule the
-     * automatic revert-to-idle timer.
-     * Return {@code null} (default) to use the animator's built-in fallback
-     * of 1600ms.
-     *
-     * Example: {@code return new int[]{1400, 1400, 1600};}
-     */
-    public int[] getSkillAnimationDurations() {
-        return null;
-    }
-
-    // ══════════════════════════════════════════════════════════
-    //  Core character mechanics
-    // ══════════════════════════════════════════════════════════
-
+    // --- Core Mechanics ---
     public void increaseMaxHP(int amount) {
         maxHP     += amount;
         currentHP += amount;
     }
 
-    public void addSkill(Skill skill) {
-        skills.add(skill);
-    }
+    public void addSkill(Skill skill) { skills.add(skill); }
 
     public void takeDamage(int damage) {
         damage    = Math.max(0, damage);
@@ -103,24 +54,18 @@ public abstract class Character {
         if (currentHP > maxHP) currentHP = maxHP;
     }
 
-    public boolean isAlive() {
-        return currentHP > 0;
-    }
-
-    public void reset() {
-        currentHP = maxHP;
-    }
+    public boolean isAlive() { return currentHP > 0; }
+    public void reset() { currentHP = maxHP; }
 
     @Override
-    public String toString() {
-        return name + " (" + currentHP + "/" + maxHP + " HP)";
-    }
+    public String toString() { return name + " (" + currentHP + "/" + maxHP + " HP)"; }
 
-    // ── Getters ───────────────────────────────────────────────
+    // --- Getters ---
     public List<Skill> getSkills()      { return new ArrayList<>(skills); }
     public String      getName()        { return name;      }
     public String      getTitle()       { return title;     }
     public String      getBackstory()   { return backstory; }
     public int         getCurrentHP()   { return currentHP; }
     public int         getMaxHP()       { return maxHP;     }
+    public Element     getElement()     { return element;   }
 }

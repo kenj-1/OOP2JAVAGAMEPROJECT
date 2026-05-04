@@ -2,7 +2,10 @@ package encantadia.ui.frames;
 
 import encantadia.ScreenManager;
 import encantadia.battle.arcade.ArcadeModeManager;
+import encantadia.battle.arcade.DatabaseManager;
 import encantadia.characters.Character;
+import encantadia.audio.MusicManager;
+import encantadia.audio.SFXManager;
 
 import javax.swing.*;
 import java.awt.*;
@@ -19,6 +22,8 @@ public class ArcadeVictoryFrame extends JFrame {
     };
 
     private final Character winner;
+    private final ArcadeModeManager manager; // 📈 Added Manager Reference
+
     private Timer           animTimer;
     private float           tick = 0f;
 
@@ -30,9 +35,17 @@ public class ArcadeVictoryFrame extends JFrame {
     private JLabel loreLabel;
     private JLabel dotLabel;
 
-    public ArcadeVictoryFrame(Character winner) {
+    public ArcadeVictoryFrame(Character winner, ArcadeModeManager manager) {
         this.winner = winner;
+        this.manager = manager;
+
+        manager.markEndTime(); // Stop the real-time clock!
         ArcadeModeManager.setArcadeCompleted(true);
+
+        // 🎵 Strict Audio Cutoff to ensure Fanfare priority
+        MusicManager.stop();
+        SFXManager.stopAll();
+        SFXManager.playVictoryFanfare();
 
         setTitle("Encantadia — Arcade Clear!");
         setSize(1024, 768);
@@ -58,6 +71,8 @@ public class ArcadeVictoryFrame extends JFrame {
         if (animTimer  != null) { animTimer.stop();  animTimer = null; }
         if (typeTimer  != null) { typeTimer.stop();  typeTimer = null; }
         if (pauseTimer != null) { pauseTimer.stop(); pauseTimer = null; }
+
+        SFXManager.stopVictoryFanfare(); // Clean up audio
         ScreenManager.unregister(this);
         super.dispose();
     }
@@ -154,13 +169,14 @@ public class ArcadeVictoryFrame extends JFrame {
         JButton returnBtn = makeGoldButton("Claim Trophy & Record Stats");
         returnBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
         returnBtn.addActionListener(e -> {
-            String tag = promptForTag();
+            String tag = showThemedTagDialog();
             if (tag != null) {
-                encantadia.battle.arcade.DatabaseManager.getInstance().saveRecord(
+                // 📈 FETCH REAL-TIME STATS
+                DatabaseManager.getInstance().saveRecord(
                         tag,
-                        300,   // TODO: replace with actual time
-                        15000, // TODO: replace with actual damage dealt
-                        8000,  // TODO: replace with actual damage received
+                        manager.getTotalTimeSeconds(),
+                        manager.getTotalDamageDealt(),
+                        manager.getTotalDamageReceived(),
                         true
                 );
                 dispose();
@@ -186,22 +202,105 @@ public class ArcadeVictoryFrame extends JFrame {
         return panel;
     }
 
-    public String promptForTag() {
-        while (true) {
-            String tag = JOptionPane.showInputDialog(this, "Enter 3-Letter Player Tag:", "Record Stats", JOptionPane.PLAIN_MESSAGE);
-            if (tag == null) return null;
-            tag = tag.trim().toUpperCase();
+    private String showThemedTagDialog() {
+        JDialog dialog = new JDialog(this, "Record Stats", true);
+        dialog.setUndecorated(true);
+        dialog.setSize(400, 230);
+        dialog.setLocationRelativeTo(this);
 
-            if (tag.length() != 3 || !tag.matches("[A-Z]{3}")) {
-                JOptionPane.showMessageDialog(this, "Tag must be EXACTLY 3 letters (A-Z).", "Invalid Input", JOptionPane.ERROR_MESSAGE);
-                continue;
+        JPanel panel = new JPanel(null) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(20, 15, 10, 240));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
+                g2.setColor(new Color(200, 160, 40));
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 16, 16);
+                g2.dispose();
             }
-            if (encantadia.battle.arcade.DatabaseManager.getInstance().isNameTaken(tag)) {
-                JOptionPane.showMessageDialog(this, "Tag '" + tag + "' is already taken! Choose another.", "Duplicate Tag", JOptionPane.WARNING_MESSAGE);
-                continue;
+        };
+        dialog.setContentPane(panel);
+        panel.setOpaque(false);
+
+        JLabel title = new JLabel("RECORD YOUR LEGACY", SwingConstants.CENTER);
+        title.setFont(new Font("Serif", Font.BOLD, 18));
+        title.setForeground(new Color(220, 180, 60));
+        title.setBounds(0, 20, 400, 30);
+        panel.add(title);
+
+        JLabel prompt = new JLabel("Enter 3-Letter Player Tag:", SwingConstants.CENTER);
+        prompt.setFont(new Font("Serif", Font.ITALIC, 14));
+        prompt.setForeground(new Color(200, 200, 200));
+        prompt.setBounds(0, 50, 400, 20);
+        panel.add(prompt);
+
+        JTextField input = new JTextField();
+        input.setBounds(150, 80, 100, 40);
+        input.setFont(new Font("Monospaced", Font.BOLD, 24));
+        input.setHorizontalAlignment(JTextField.CENTER);
+        input.setBackground(new Color(30, 20, 15));
+        input.setForeground(Color.WHITE);
+        input.setCaretColor(new Color(200, 160, 40));
+        input.setBorder(BorderFactory.createLineBorder(new Color(200, 160, 40)));
+        panel.add(input);
+
+        JLabel error = new JLabel("", SwingConstants.CENTER);
+        error.setFont(new Font("SansSerif", Font.BOLD, 11));
+        error.setForeground(new Color(255, 80, 80));
+        error.setBounds(0, 130, 400, 20);
+        panel.add(error);
+
+        String[] result = new String[1];
+
+        JButton submit = makeDialogButton("Submit");
+        submit.setBounds(60, 165, 120, 40);
+        submit.addActionListener(e -> {
+            String txt = input.getText().trim().toUpperCase();
+            if (txt.length() != 3 || !txt.matches("[A-Z]{3}")) {
+                error.setText("Tag must be exactly 3 letters (A-Z).");
+            } else if (encantadia.battle.arcade.DatabaseManager.getInstance().isNameTaken(txt)) {
+                error.setText("Tag '" + txt + "' is taken! Choose another.");
+            } else {
+                result[0] = txt;
+                dialog.dispose();
             }
-            return tag;
-        }
+        });
+
+        JButton cancel = new JButton("Skip");
+        cancel.setForeground(new Color(150, 150, 150));
+        cancel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        cancel.setContentAreaFilled(false);
+        cancel.setBorderPainted(false);
+        cancel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        cancel.setBounds(220, 165, 120, 40);
+        cancel.addActionListener(e -> dialog.dispose());
+
+        panel.add(submit);
+        panel.add(cancel);
+
+        dialog.setBackground(new Color(0, 0, 0, 0));
+        dialog.setVisible(true);
+        return result[0];
+    }
+
+    private JButton makeDialogButton(String text) {
+        JButton btn = new JButton(text) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean h = getModel().isRollover();
+                g2.setPaint(new GradientPaint(0, 0, h ? new Color(170, 110, 40) : new Color(120, 70, 20), 0, getHeight(), h ? new Color(120, 80, 30) : new Color(80, 40, 10)));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.setColor(new Color(220, 180, 90)); g2.setStroke(new BasicStroke(1.5f)); g2.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 8, 8);
+                g2.setFont(new Font("Serif", Font.BOLD, 14)); FontMetrics fm = g2.getFontMetrics();
+                int tx = (getWidth()-fm.stringWidth(getText()))/2, ty = (getHeight()+fm.getAscent())/2 - 2;
+                g2.setColor(Color.BLACK); g2.drawString(getText(), tx+1, ty+1); g2.setColor(new Color(255, 230, 170)); g2.drawString(getText(), tx, ty);
+                g2.dispose();
+            }
+        };
+        btn.setOpaque(false); btn.setContentAreaFilled(false); btn.setBorderPainted(false); btn.setFocusPainted(false); btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
     }
 
     private void startTypewriter() {

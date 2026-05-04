@@ -11,7 +11,11 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.net.URL;
+import encantadia.audio.MusicManager;
+import encantadia.audio.MusicType;
 
 public class MainMenuFrame extends JFrame {
 
@@ -25,15 +29,19 @@ public class MainMenuFrame extends JFrame {
     private static final String BTN_PVE      = "/resources/PVEButton (1).png";
     private static final String BTN_PVP      = "/resources/PVPButton (1).png";
     private static final String BTN_EXIT     = "/resources/exitButton (3).png";
-
-    // Updated path to point to the new pixel-art asset
     private static final String BTN_LEADER   = "/resources/leaderboardBUTTON.png";
+
+    // 🏆 TROPHY ASSETS
+    private static final String TROPHY_EARNED  = "/resources/Trophy.png";
+    private static final String TROPHY_FAILED  = "/resources/TrophyFailed.png";
+    private static final String TROPHY_OVERLAY = "/resources/TrophyWon.png";
 
     private ImagePanel       holderPanel;
     private JPanel           buttonsInsideHolder;
     private JPanel           exitRow;
     private ScaledImagePanel titlePanel;
     private TrophyPanel      trophyPanel;
+    private JPanel           victoryOverlay; // The pop-up modal
 
     public MainMenuFrame() {
         setTitle("Encantadia: Echoes of the Gem — Main Menu");
@@ -48,17 +56,17 @@ public class MainMenuFrame extends JFrame {
         setContentPane(lp);
 
         BackgroundPanel bg = new BackgroundPanel(BG_PATH);
-        lp.add(bg, JLayeredPane.DEFAULT_LAYER);
+        lp.add(bg, Integer.valueOf(0)); // DEFAULT_LAYER
 
         ScaledImagePanel columns = new ScaledImagePanel(COLUMNS_PATH);
-        lp.add(columns, JLayeredPane.PALETTE_LAYER);
+        lp.add(columns, Integer.valueOf(100)); // PALETTE_LAYER
 
         titlePanel = new ScaledImagePanel(TITLE_PATH);
-        lp.add(titlePanel, JLayeredPane.MODAL_LAYER);
+        lp.add(titlePanel, Integer.valueOf(200)); // MODAL_LAYER
 
         holderPanel = new ImagePanel(HOLDER_PATH);
         holderPanel.setLayout(new GridBagLayout());
-        lp.add(holderPanel, JLayeredPane.POPUP_LAYER);
+        lp.add(holderPanel, Integer.valueOf(300)); // POPUP_LAYER
 
         arcadeButton = createImageButton(BTN_ARCADE);
         PVEButton    = createImageButton(BTN_PVE);
@@ -79,9 +87,6 @@ public class MainMenuFrame extends JFrame {
 
         leaderboardButton = createImageButton(BTN_LEADER);
 
-        // --- CHANGE: Manual text is no longer needed ---
-        // leaderboardButton.setText("Leaderboard");
-
         exitGameButton = createImageButton(BTN_EXIT);
         exitGameButton.setText("Exit");
 
@@ -89,10 +94,39 @@ public class MainMenuFrame extends JFrame {
         exitRow.setOpaque(false);
         exitRow.add(leaderboardButton);
         exitRow.add(exitGameButton);
-        lp.add(exitRow, JLayeredPane.DRAG_LAYER);
+        lp.add(exitRow, Integer.valueOf(400)); // DRAG_LAYER
 
         trophyPanel = new TrophyPanel();
-        lp.add(trophyPanel, JLayeredPane.DRAG_LAYER);
+        lp.add(trophyPanel, Integer.valueOf(400));
+
+        // 🌟 VICTORY OVERLAY MODAL (Hidden by default)
+        victoryOverlay = new JPanel(null) {
+            private final Image wonImg = loadImage(TROPHY_OVERLAY);
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                // Dark translucent backdrop
+                g2.setColor(new Color(0, 0, 0, 210));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+
+                if (wonImg != null) {
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    int iw = wonImg.getWidth(null), ih = wonImg.getHeight(null);
+                    double scale = Math.min((double)getWidth()*0.6 / iw, (double)getHeight()*0.6 / ih);
+                    int dw = (int)(iw * scale), dh = (int)(ih * scale);
+                    g2.drawImage(wonImg, (getWidth() - dw) / 2, (getHeight() - dh) / 2, dw, dh, null);
+                }
+                g2.dispose();
+            }
+        };
+        victoryOverlay.setOpaque(false);
+        victoryOverlay.setVisible(false);
+
+        JButton closeOverlayBtn = createImageButton("/resources/exitButton (1).png");
+        closeOverlayBtn.setText("Close");
+        closeOverlayBtn.addActionListener(e -> victoryOverlay.setVisible(false));
+        victoryOverlay.add(closeOverlayBtn);
+
+        lp.add(victoryOverlay, Integer.valueOf(500)); // Highest Layer!
 
         PVPButton.addActionListener(   e -> launchMode(GameModeType.PVP));
         PVEButton.addActionListener(   e -> launchMode(GameModeType.PVE));
@@ -102,29 +136,31 @@ public class MainMenuFrame extends JFrame {
 
         addComponentListener(new ComponentAdapter() {
             @Override public void componentResized(ComponentEvent e) {
-                reposition(lp, bg, columns);
+                reposition(lp, bg, columns, closeOverlayBtn);
             }
         });
 
         setVisible(true);
+
         ScreenManager.register(this);
-        SwingUtilities.invokeLater(() -> reposition(lp, bg, columns));
+        SwingUtilities.invokeLater(() -> reposition(lp, bg, columns, closeOverlayBtn));
+
+        // ✅ START MENU MUSIC
+        MusicManager.play(MusicType.MENU);
     }
 
-    @Override
-    public void dispose() { ScreenManager.unregister(this); super.dispose(); }
-
-    private void reposition(JLayeredPane pane, JPanel bg, JPanel columns) {
+    private void reposition(JLayeredPane pane, JPanel bg, JPanel columns, JButton closeOverlayBtn) {
         int w = pane.getWidth(), h = pane.getHeight();
         if (w == 0 || h == 0) return;
 
         bg.setBounds(0, 0, w, h);
         columns.setBounds(0, 0, w, h);
+        victoryOverlay.setBounds(0, 0, w, h); // Overlay covers the entire screen
 
         int holderW = Math.min(600, (int)(w * 0.55));
         int holderH = Math.min(680, (int)(h * 0.85));
         int holderX = (w - holderW) / 2;
-        int holderY = (int)(h * 0.10);
+        int holderY = (int)(h * 0.15);
         holderPanel.setBounds(holderX, holderY, holderW, holderH);
 
         int titleW = Math.min(680, (int)(w * 0.65));
@@ -133,9 +169,9 @@ public class MainMenuFrame extends JFrame {
         int titleY = Math.max(0, holderY - (int)(titleH * 0.60));
         titlePanel.setBounds(titleX, titleY, titleW, titleH);
 
-        int btnW = (int)(holderW * 0.65);
-        int btnH = (int)(btnW * 0.28);
-        int gap  = Math.max(10, (int)(holderH * 0.03));
+        int btnW = (int)(holderW * 0.72);
+        int btnH = (int)(btnW * 0.32);
+        int gap  = Math.max(12, (int)(holderH * 0.03));
 
         Dimension mainSize = new Dimension(btnW, btnH);
         for (JButton b : new JButton[]{PVPButton, PVEButton, arcadeButton}) {
@@ -145,16 +181,28 @@ public class MainMenuFrame extends JFrame {
             b.setAlignmentX(Component.CENTER_ALIGNMENT);
         }
 
-        // --- OPTIONAL: Adjust the size of the exit/leaderboard buttons if needed ---
-        // This size might feel different now that it's a fixed image.
-        int exitW = (int)(btnW * 0.45);
-        int exitH = (int)(exitW * 0.45);
-        Dimension exitSize = new Dimension(exitW, exitH);
+        int sideBtnSize = (int)(Math.min(w, h) * 0.125);
+        Dimension sideSize = new Dimension(sideBtnSize, sideBtnSize);
 
-        exitGameButton.setPreferredSize(exitSize);
-        leaderboardButton.setPreferredSize(exitSize);
+        exitGameButton.setPreferredSize(sideSize);
+        leaderboardButton.setPreferredSize(sideSize);
+        exitGameButton.setMinimumSize(sideSize);
+        leaderboardButton.setMinimumSize(sideSize);
+        exitGameButton.setMaximumSize(sideSize);
+        leaderboardButton.setMaximumSize(sideSize);
+
         exitGameButton.setContentAreaFilled(false);
         leaderboardButton.setContentAreaFilled(false);
+
+        int centerY = holderY + (holderH / 2);
+        int sidePadding = (int)(w * 0.03);
+
+        int lbX = sidePadding;
+        int exitX = w - sideBtnSize - sidePadding;
+        int sideY = centerY - (sideBtnSize / 2);
+
+        leaderboardButton.setBounds(lbX, sideY, sideBtnSize, sideBtnSize);
+        exitGameButton.setBounds(exitX, sideY, sideBtnSize, sideBtnSize);
 
         buttonsInsideHolder.setBounds(0, 0, holderW, holderH);
         buttonsInsideHolder.removeAll();
@@ -169,45 +217,49 @@ public class MainMenuFrame extends JFrame {
         buttonsInsideHolder.add(exitRow);
         buttonsInsideHolder.add(Box.createVerticalStrut((int)(holderH * 0.08)));
 
+        // --- TROPHY POSITION ---
         int rightPillarLeft = (int)(w * 0.85);
         int gapCentreX = holderX + holderW + (rightPillarLeft - holderX - holderW) / 2;
-        int trophySize = Math.min(140, Math.max(70, (int)(Math.min(w, h) * 0.12)));
-
+        int trophySize = Math.min(180, Math.max(100, (int)(w * 0.15))); // Slightly larger
         int trophyX = gapCentreX - trophySize / 2;
         int trophyY = holderY + (holderH - trophySize) / 2;
+
         trophyPanel.setBounds(trophyX, trophyY, trophySize, trophySize);
 
-        holderPanel.revalidate(); holderPanel.repaint();
-        pane.revalidate();        pane.repaint();
+        // --- OVERLAY CLOSE BUTTON POSITION ---
+        int cw = (int)(w * 0.18);
+        int ch = (int)(cw * 0.4);
+        closeOverlayBtn.setBounds((w - cw)/2, (int)(h * 0.82), cw, ch);
+
+        holderPanel.revalidate();
+        holderPanel.repaint();
+        pane.revalidate();
+        pane.repaint();
     }
 
     private void launchMode(GameModeType mode) {
         dispose();
-        switch (mode) {
-            case PVE:    new PVEMode();    break;
-            case PVP:    new PVPMode();    break;
-            case ARCADE: new ArcadeMode(); break;
-        }
+        SwingUtilities.invokeLater(() -> {
+            switch (mode) {
+                case PVE -> new PVEMode();
+                case PVP -> new PVPMode();
+                case ARCADE -> new ArcadeMode();
+            }
+        });
     }
 
     private JButton createImageButton(String path) {
         Image img = loadImage(path);
         JButton btn = new JButton() {
             @Override protected void paintComponent(Graphics g) {
-                // FALLBACK PAINTING: This draws the yellow rectangle seen before
-                // It will only execute if img == null, so if your asset path is correct,
-                // this code is ignored.
                 if (img == null) {
                     g.setColor(new Color(0xC8, 0xA0, 0x28));
                     g.fillRect(0, 0, getWidth(), getHeight());
                     g.setColor(Color.BLACK);
-                    // The font settings here are what control the text in the placeholder
                     g.setFont(new Font("Serif", Font.PLAIN, 12));
                     g.drawString(getText(), 10, getHeight()/2 + 5);
                     return;
                 }
-
-                // MAIN IMAGE PAINTING (executes when the asset is found)
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -299,64 +351,49 @@ public class MainMenuFrame extends JFrame {
         }
     }
 
+    // 🏆 NEW: State-driven Interactive Trophy Panel
     private class TrophyPanel extends JPanel {
         private float time = 0f;
+        private final Image earnedImg = loadImage(TROPHY_EARNED);
+        private final Image failedImg = loadImage(TROPHY_FAILED);
+
         TrophyPanel() {
             setOpaque(false);
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+            // Kinetic Polish: Continually updates time for the sine wave
             new Timer(16, e -> { time += 0.04f; repaint(); }).start();
+
+            // Interaction Trigger
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (ArcadeModeManager.isArcadeCompleted()) {
+                        victoryOverlay.setVisible(true); // Pop open the interactive overlay
+                    }
+                }
+            });
         }
 
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (!ArcadeModeManager.isArcadeCompleted()) return;
-
             Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-            int W = getWidth(), H = getHeight();
-            int labelH  = Math.max(16, (int)(H * 0.22));
-            int gemArea = H - labelH;
-            int cx = W / 2, cy = gemArea / 2;
+            boolean isEarned = ArcadeModeManager.isArcadeCompleted();
+            Image displayImg = isEarned ? earnedImg : failedImg;
 
-            float pulse = (float)(0.82 + 0.18 * Math.sin(time));
-            int sz = (int)(Math.min(W, gemArea) * 0.40 * pulse);
+            if (displayImg != null) {
+                int iw = displayImg.getWidth(null), ih = displayImg.getHeight(null);
+                double scale = Math.min((double) getWidth() / iw, (double) getHeight() / ih);
+                int dw = (int) (iw * scale), dh = (int) (ih * scale);
+                int dx = (getWidth() - dw) / 2;
 
-            int[] xs = { cx,      cx + sz, cx,      cx - sz };
-            int[] ys = { cy - sz, cy,      cy + sz, cy      };
+                // 🪄 Kinetic Hover: Smoothly oscillates up and down by 8 pixels
+                int dy = (getHeight() - dh) / 2 + (int)(Math.sin(time) * 8);
 
-            for (int ring = 6; ring >= 1; ring--) {
-                int alpha = Math.min(255, 18 * (7 - ring));
-                g2.setColor(new Color(0xC8, 0xA0, 0x28, alpha));
-                g2.setStroke(new BasicStroke(ring * 2f));
-                g2.drawPolygon(xs, ys, 4);
+                g2.drawImage(displayImg, dx, dy, dw, dh, null);
             }
-
-            g2.setPaint(new GradientPaint(
-                    cx, cy - sz, new Color(0xFF, 0xF0, 0x60),
-                    cx, cy + sz, new Color(0xFF, 0x80, 0x00)));
-            g2.fillPolygon(xs, ys, 4);
-
-            g2.setColor(new Color(255, 255, 255, 105));
-            g2.setStroke(new BasicStroke(1.8f));
-            g2.drawLine(cx - sz/3, cy - sz/2, cx + sz/5, cy - sz/6);
-
-            g2.setColor(new Color(0xC8, 0xA0, 0x28));
-            g2.setStroke(new BasicStroke(1.5f));
-            g2.drawPolygon(xs, ys, 4);
-
-            int fontSize = Math.max(8, (int)(labelH * 0.70));
-            g2.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, fontSize));
-            FontMetrics fm = g2.getFontMetrics();
-            String lbl = "Arcade";
-            int lx = cx - fm.stringWidth(lbl) / 2;
-            int ly = gemArea + fm.getAscent();
-
-            g2.setColor(new Color(0, 0, 0, 120));
-            g2.drawString(lbl, lx + 1, ly + 1);
-            g2.setColor(new Color(0xC8, 0xA0, 0x28));
-            g2.drawString(lbl, lx, ly);
-
             g2.dispose();
         }
     }

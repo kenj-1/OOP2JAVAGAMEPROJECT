@@ -24,6 +24,8 @@ public class Dirk extends Character {
                 "Emerging from the mountains, Dirk protects the land with unwavering devotion."
         );
 
+        this.element = Element.EARTH;
+
         skills.add(new Skill("Bato Dela Rosa", 230, 310, 0,
                 Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
@@ -35,7 +37,7 @@ public class Dirk extends Character {
         skills.add(new Skill("Linog", 500, 650, 3,
                 Skill.SkillType.DAMAGE,
                 Skill.EffectType.DAMAGE_REDUCTION,
-                0.40,
+                0.55,
                 1.0));
     }
 

@@ -29,6 +29,8 @@ public class Adamus extends Character {
                         "to water and fire alike."
         );
 
+        this.element = Element.WATER;
+
         // FIX: These are DAMAGE, not HEAL
         skills.add(new Skill("Water Spear", 220, 300, 0,
                 Skill.SkillType.DAMAGE,

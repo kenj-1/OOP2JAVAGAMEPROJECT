@@ -28,6 +28,8 @@ public class Tera extends Character {
                         "nature ensures she remains the shield that guards against total collapse."
         );
 
+        this.element = Element.EARTH;
+
         skills.add(new Skill("Rock Smash", 230, 310, 0,
                 Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));
@@ -40,8 +42,8 @@ public class Tera extends Character {
         skills.add(new Skill("Nature's Wrath", 500, 650, 3,
                 Skill.SkillType.DAMAGE,
                 Skill.EffectType.HEAL,
-                450,
-                1.0));
+                350,
+                0.8));
     }
 
     // ── Animation Overrides ───────────────────────────────────────────────────

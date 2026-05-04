@@ -24,6 +24,9 @@ import java.awt.geom.AffineTransform;
 import java.net.URL;
 import java.util.List;
 
+import encantadia.audio.MusicManager;
+import encantadia.audio.MusicType;
+
 public class PVPBattleFrame extends JFrame {
 
     private javax.swing.Timer turnCountdownTimer;
@@ -31,6 +34,12 @@ public class PVPBattleFrame extends JFrame {
     private static final int  MATCH_DURATION_SECONDS = 60;
     private javax.swing.Timer matchTimer;
     private int               matchTimeLeft = MATCH_DURATION_SECONDS;
+
+    private Character player1;
+    private Character player2;
+
+    private CharacterAnimator p1Animator;
+    private CharacterAnimator p2Animator;
 
     private Timer p2SelectCountdownTimer;
     private Timer p2SelectPulseTimer;
@@ -43,7 +52,7 @@ public class PVPBattleFrame extends JFrame {
     private static final String[] ROUND_TABLETS = { "/resources/round1.png", "/resources/round2.png", "/resources/round3.png" };
     private static final String[] ROUND_TEXTS = { "/resources/round1Text.png", "/resources/round2Text.png", "/resources/round3Text.png" };
     private static final String[] FRAME_IMGS = { "/resources/TyroneFrameName.png", "/resources/ElanFrameName.png", "/resources/ClaireFrameName.png", "/resources/DirkFrameName.png", "/resources/FlamaraFrameName.png", "/resources/DeaFrameName.png", "/resources/AdamusFrameName.png", "/resources/TeraFrameName.png" };
-    private static final String[] PORTRAIT_IMGS = { "/resources/tyroneFrame (1).png", "/resources/elanFrame (1).png", "/resources/claireFrame (1).png", "/resources/dirkFrame (1).png", "/resources/flamaraFrame (1).png", "/resources/deaFrame (1).png", "/resources/adamusFrame (1).png",  "/resources/teraFrame (1).png" };
+    private static final String[] PORTRAIT_IMGS = { "/resources/TyroneFrame.png", "/resources/ElanFrame.png", "/resources/ClaireFrame.png", "/resources/DirkFrame.png", "/resources/FlamaraFrame1.png", "/resources/DeaFrame1.png", "/resources/AdamusFrame1.png",  "/resources/TeraFrame1.png" };
     private static final String[] CHAR_NAMES = { "Tyrone","Makelan Shere","Claire","Dirk","Flamara","Dea","Adamus","Tera" };
     private static final Color[] GLOW_COLORS = { new Color(0xFF,0x60,0x20), new Color(0x40,0xA0,0xFF), new Color(0x40,0xE0,0x60), new Color(0xFF,0xCC,0x30), new Color(0xFF,0x40,0x20), new Color(0x60,0xA0,0xFF), new Color(0x30,0xDD,0x88), new Color(0xFF,0xCC,0x00) };
     private static final Character[] ROSTER = { new Tyrone(), new MakelanShere(), new Mary(), new Dirk(), new Flamara(), new Dea(), new Adamus(), new Tera() };
@@ -66,12 +75,10 @@ public class PVPBattleFrame extends JFrame {
     private static final String CARD_COIN   = "COIN_TOSS";
     private static final String CARD_BATTLE = "BATTLE";
 
-    private final Character player1;
-    private Character       player2;
+
     private TurnManager     turnManager;
 
-    private CharacterAnimator p1Animator;
-    private CharacterAnimator p2Animator;
+
     private float p1FlashAlpha = 0f;
     private float p2FlashAlpha = 0f;
 
@@ -115,7 +122,9 @@ public class PVPBattleFrame extends JFrame {
 
     public PVPBattleFrame(Character player1character) {
         this.player1 = player1character;
+
         this.p1Animator = CharacterAnimator.forCharacter(player1);
+        // REMOVED: this.p2Animator = CharacterAnimator.forCharacter(player2);  <-- This was causing the NullPointerException!
 
         setTitle("PVP Battle");
         setSize(1024, 768);
@@ -143,11 +152,14 @@ public class PVPBattleFrame extends JFrame {
 
     @Override
     public void dispose() {
-        stopP2SelectTimer(); stopMatchTimer(); stopTurnTimer();
-        if (bobTimer != null) bobTimer.stop();
-        if (glowAnimTimer != null) glowAnimTimer.stop();
+        MusicManager.stop();
+
+        stopMatchTimer();
+        stopTurnTimer();
+
         if (p1Animator != null) p1Animator.dispose();
         if (p2Animator != null) p2Animator.dispose();
+
         ScreenManager.unregister(this);
         super.dispose();
     }
@@ -307,6 +319,13 @@ public class PVPBattleFrame extends JFrame {
         refreshUI(); refreshAllCdLabels(); updateTurnState(); showRoundAnnouncement(currentRound);
         log("⚔  Round " + currentRound + " — First to " + ROUNDS_TO_WIN + " round wins!"); log(player1.getName() + " [P1]  vs  " + player2.getName() + " [P2]"); log("🪙  " + (p1GoesFirst ? player1.getName() + " (P1)" : player2.getName() + " (P2)") + " goes first!");
         startMatchTimer();
+
+
+    // ✅ STOP any previous music first
+        MusicManager.stop();
+
+    // 🎵 START battle music
+        MusicManager.playWithDelay(MusicType.BATTLE, 300);
     }
 
     private JPanel buildBattlePanel() {
@@ -648,6 +667,24 @@ public class PVPBattleFrame extends JFrame {
         double scale = Math.max((double) w / iw, (double) h / ih); int dw = (int) (iw * scale), dh = (int) (ih * scale); g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
     }
 
+    private void drawImageCover(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return;
+
+        int iw = img.getWidth(null);
+        int ih = img.getHeight(null);
+        if (iw <= 0 || ih <= 0) return;
+
+        double scale = Math.max((double) w / iw, (double) h / ih);
+
+        int dw = (int)(iw * scale);
+        int dh = (int)(ih * scale);
+
+        int dx = x + (w - dw) / 2;
+        int dy = y + (h - dh) / 2;
+
+        g2.drawImage(img, dx, dy, dw, dh, null);
+    }
+
     // ══════════════════════════════════════════════════════════
     //  BattleCanvas
     // ══════════════════════════════════════════════════════════
@@ -680,7 +717,7 @@ public class PVPBattleFrame extends JFrame {
 
             drawFlankingTimers(g2, W, tabX, tabY, tabW, tabH, sc);
 
-            int portW = (int) (82 * sc), portH = (int) (82 * sc), hpW = (int) (230 * sc), hpH = (int) (16 * sc);
+            int portW = (int) (130 * sc), portH = (int) (120 * sc), hpW = (int) (230 * sc), hpH = (int) (16 * sc);
             int pillW = (int) (140 * sc), pillH = (int) (24 * sc), portY = tabY + tabH + (int) (6 * sc);
 
             // P1 HUD
@@ -820,7 +857,7 @@ public class PVPBattleFrame extends JFrame {
                 for (int r = 5; r >= 1; r--) { int sp = r * 3; g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), Math.min(255, (int) (a * 80 / r)))); g2.setStroke(new BasicStroke(sp)); g2.drawRoundRect(x - sp / 2, y - sp / 2, w + sp, h + sp, 10, 10); }
             }
             g2.setColor(new Color(0x08, 0x05, 0x02, 200)); g2.fillRoundRect(x, y, w, h, 8, 8);
-            if (img != null) drawImageProportional(g2, img, x, y, w, h);
+            if (img != null) drawImageCover(g2, img, x, y, w, h);
             g2.setStroke(new BasicStroke(2)); g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), active ? 220 : 90)); g2.drawRoundRect(x, y, w, h, 8, 8);
         }
 

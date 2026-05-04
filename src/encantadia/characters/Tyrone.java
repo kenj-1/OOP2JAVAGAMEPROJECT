@@ -26,6 +26,8 @@ public class Tyrone extends Character {
                         "the truth behind Joygen's disappearance, embarking on a journey that would test his courage, skill, and heart."
         );
 
+        this.element = Element.FIRE;
+
         skills.add(new Skill("Fire Blaze", 260, 340, 0,
                 Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));

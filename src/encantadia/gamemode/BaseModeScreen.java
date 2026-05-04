@@ -12,6 +12,8 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.net.URL;
 
+
+
 public abstract class BaseModeScreen extends JFrame {
 
     protected static final String HOLDER_PATH   = "/resources/mainMenuHolder.png";
@@ -57,7 +59,10 @@ public abstract class BaseModeScreen extends JFrame {
     protected abstract StoryType getStoryType();
     protected abstract GameModeType getGameModeType();
 
+
     protected void init() {
+
+
         setTitle(getWindowTitle());
         setSize(1024, 768);
         setLocationRelativeTo(null);
@@ -67,6 +72,8 @@ public abstract class BaseModeScreen extends JFrame {
         JLayeredPane lp = new JLayeredPane();
         lp.setLayout(null);
         setContentPane(lp);
+
+
 
         ImagePanel bg = new ImagePanel(getBackgroundPath());
         lp.add(bg, JLayeredPane.DEFAULT_LAYER);
@@ -118,6 +125,11 @@ public abstract class BaseModeScreen extends JFrame {
         setVisible(true);
         ScreenManager.register(this);
         SwingUtilities.invokeLater(() -> reposition(lp, bg));
+
+    }
+
+    public BaseModeScreen() {
+        init();
     }
 
     @Override

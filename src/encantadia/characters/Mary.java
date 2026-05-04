@@ -55,6 +55,8 @@ public class Mary extends Character {
                         "that threatens to drown Encantadia itself.\n\n"
         );
 
+        this.element = Element.WATER;
+
         // Skill 0 – Luha  (basic water bolt)
         skills.add(new Skill(
                 "Luha", 220, 300, 0,

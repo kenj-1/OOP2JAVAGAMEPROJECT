@@ -28,6 +28,8 @@ public class Flamara extends Character {
                         "the goddess who once taught her the true mastery of fire."
         );
 
+        this.element = Element.FIRE;
+
         skills.add(new Skill("Fire Ball", 280, 360, 0,
                 Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));

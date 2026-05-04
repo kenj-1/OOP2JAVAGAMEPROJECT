@@ -17,6 +17,9 @@ import java.awt.*;
 import java.awt.event.*;
 import java.net.URL;
 
+import encantadia.audio.MusicManager;
+import encantadia.audio.MusicType;
+
 public class CharacterSelectionFrame extends JFrame {
 
     // ── Selection countdown ────────────────────────────────────
@@ -156,6 +159,9 @@ public class CharacterSelectionFrame extends JFrame {
             reposition(lp);
             startSelectionTimer(); // start AFTER layout so badge is positioned
         });
+
+        // ✅ START MENU MUSIC
+        MusicManager.play(MusicType.MENU);
     }
 
     @Override
@@ -282,11 +288,15 @@ public class CharacterSelectionFrame extends JFrame {
     //  Game-flow logic
     // ══════════════════════════════════════════════════════════
     private void onCharacterSelected(Character character) {
-        stopSelectionTimer();   // cancel countdown whether manual or auto
+
+        stopSelectionTimer();
+
+
         dispose();
+
         switch (gameModeType) {
-            case PVE:    startPVEFlow(character);    break;
-            case PVP:    startPVPFlow(character);    break;
+            case PVE: startPVEFlow(character); break;
+            case PVP: startPVPFlow(character); break;
             case ARCADE: startArcadeFlow(character); break;
         }
     }

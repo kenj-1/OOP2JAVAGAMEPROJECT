@@ -16,6 +16,9 @@ import java.awt.geom.AffineTransform;
 import java.net.URL;
 import java.util.List;
 
+import encantadia.audio.MusicManager;
+import encantadia.audio.MusicType;
+
 public class PVEBattleFrame extends JFrame {
 
     private javax.swing.Timer turnCountdownTimer;
@@ -27,7 +30,7 @@ public class PVEBattleFrame extends JFrame {
     private static final String BATTLE_BG = "/resources/backgroundPve.png";
     private static final String[] ROUND_TABLETS = { "/resources/round1.png", "/resources/round2.png", "/resources/round3.png" };
     private static final String[] ROUND_TEXTS = { "/resources/round1Text.png", "/resources/round2Text.png", "/resources/round3Text.png" };
-    private static final String[] FRAME_IMGS = { "/resources/tyroneFrame (1).png", "/resources/elanFrame (1).png", "/resources/claireFrame (1).png", "/resources/dirkFrame (1).png", "/resources/flamaraFrame (1).png", "/resources/deaFrame (1).png", "/resources/adamusFrame (1).png",  "/resources/teraFrame (1).png" };
+    private static final String[] FRAME_IMGS = { "/resources/TyroneFrame.png", "/resources/ElanFrame.png", "/resources/ClaireFrame.png", "/resources/DirkFrame.png", "/resources/FlamaraFrame1.png", "/resources/DeaFrame1.png", "/resources/AdamusFrame1.png",  "/resources/TeraFrame1.png" };
     private static final String[] CHAR_NAMES = { "Tyrone","Makelan Shere","Claire","Dirk","Flamara","Dea","Adamus","Tera" };
 
     private static final int ROUNDS_TO_WIN    = 2;
@@ -89,17 +92,22 @@ public class PVEBattleFrame extends JFrame {
         log("⚔  Round " + currentRound + " — First to " + ROUNDS_TO_WIN + " wins!");
         log(playerCharacter.getName() + "  vs  " + enemyCharacter.getName());
         startMatchTimer();
+        MusicManager.playWithDelay(MusicType.BATTLE, 300);
     }
-
     @Override
     public void dispose() {
+        MusicManager.stop(); // ✅ ADD THIS FIRST
+
         stopMatchTimer();
         stopTurnTimer();
+
         if (playerAnimator != null) playerAnimator.dispose();
         if (enemyAnimator != null) enemyAnimator.dispose();
+
         ScreenManager.unregister(this);
         super.dispose();
     }
+
 
     private void onPlayerSkill(int si) {
         if (timeUpTriggered) return;
@@ -501,6 +509,25 @@ public class PVEBattleFrame extends JFrame {
         double scale = Math.min((double) w / iw, (double) h / ih); int dw = (int) (iw * scale), dh = (int) (ih * scale); g2.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, null);
     }
 
+    protected void drawImageCover(Graphics2D g2, Image img, int x, int y, int w, int h) {
+        if (img == null) return;
+
+        int iw = img.getWidth(null);
+        int ih = img.getHeight(null);
+        if (iw <= 0 || ih <= 0) return;
+
+        double scale = Math.max((double) w / iw,
+                (double) h / ih);
+
+        int dw = (int)(iw * scale);
+        int dh = (int)(ih * scale);
+
+        int dx = x + (w - dw) / 2;
+        int dy = y + (h - dh) / 2;
+
+        g2.drawImage(img, dx, dy, dw, dh, null);
+    }
+
     // ══════════════════════════════════════════════════════════
     //  BattleCanvas
     // ══════════════════════════════════════════════════════════
@@ -545,7 +572,8 @@ public class PVEBattleFrame extends JFrame {
 
             drawFlankTimers(g2, W, tabX, tabY, tabW, tabH, sc);
 
-            int portW = (int)(82*sc), portH = (int)(82*sc);
+            int portW = (int)(130*sc);
+            int portH = (int)(120*sc);
             int hpW   = (int)(230*sc), hpH  = (int)(16*sc);
             int pillW = (int)(140*sc), pillH = (int)(24*sc);
             int portY = tabY + tabH + (int)(6*sc);
@@ -704,17 +732,45 @@ public class PVEBattleFrame extends JFrame {
         }
 
         private void drawPortrait(Graphics2D g2, Image img, int x, int y, int w, int h, Color accent, boolean active) {
+
             if (active) {
-                float a = 0.25f + 0.15f * (float)Math.sin(glowTick);
+                float a = 0.22f + 0.16f * (float)Math.sin(glowTick);
                 for (int r = 5; r >= 1; r--) {
-                    int sp = r*3;
-                    g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),Math.min(255,(int)(a*80/r))));
-                    g2.setStroke(new BasicStroke(sp)); g2.drawRoundRect(x-sp/2,y-sp/2,w+sp,h+sp,10,10);
+                    int sp = r * 3;
+                    g2.setColor(new Color(
+                            accent.getRed(),
+                            accent.getGreen(),
+                            accent.getBlue(),
+                            Math.min(255, (int)(a * 80 / r))
+                    ));
+                    g2.setStroke(new BasicStroke(sp));
+                    g2.drawRoundRect(x - sp/2, y - sp/2, w + sp, h + sp, 10, 10);
                 }
             }
-            g2.setColor(new Color(0x08,0x05,0x02,200)); g2.fillRoundRect(x,y,w,h,8,8);
-            if (img != null) drawImageProportional(g2, img, x, y, w, h);
-            g2.setStroke(new BasicStroke(2)); g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),active?220:100)); g2.drawRoundRect(x,y,w,h,8,8);
+
+            g2.setColor(new Color(0x08, 0x05, 0x02, 210));
+            g2.fillRoundRect(x, y, w, h, 8, 8);
+
+            if (img != null) {
+                int iw = img.getWidth(null);
+                int ih = img.getHeight(null);
+
+                if (iw > 0 && ih > 0) {
+                    double scale = Math.max((double) w / iw, (double) h / ih);
+
+                    int dw = (int)(iw * scale);
+                    int dh = (int)(ih * scale);
+
+                    int dx = x + (w - dw) / 2;
+                    int dy = y + (h - dh) / 2;
+
+                    g2.drawImage(img, dx, dy, dw, dh, null);
+                }
+            }
+
+            g2.setStroke(new BasicStroke(2));
+            g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), active ? 220 : 90));
+            g2.drawRoundRect(x, y, w, h, 8, 8);
         }
 
         private void drawHPBar(Graphics2D g2, int x, int y, int w, int h, Character c, Color base) {
@@ -844,19 +900,36 @@ public class PVEBattleFrame extends JFrame {
 
     private class BgPanel extends JPanel {
         private final Image img;
-        BgPanel(String p) { img = loadImage(p); setOpaque(true); setBackground(Color.BLACK); }
-        @Override protected void paintComponent(Graphics g) {
+
+        BgPanel(String p) {
+            img = loadImage(p);
+            setOpaque(true);
+            setBackground(Color.BLACK);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
             super.paintComponent(g);
+
             if (img != null) {
-                int iw = img.getWidth(null), ih = img.getHeight(null);
+                int iw = img.getWidth(null);
+                int ih = img.getHeight(null);
                 if (iw <= 0 || ih <= 0) return;
+
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                // Scale to fully cover the panel
-                double scale = Math.max((double) getWidth() / iw, (double) getHeight() / ih);
-                int dw = (int)(iw * scale), dh = (int)(ih * scale);
-                int dx = (getWidth() - dw) / 2;   // center horizontally
-                int dy = getHeight() - dh;          // anchor bottom — floor is always visible
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+                // FULL COVER (no black bars)
+                double scale = Math.max((double) getWidth() / iw,
+                        (double) getHeight() / ih);
+
+                int dw = (int) (iw * scale);
+                int dh = (int) (ih * scale);
+
+                int dx = (getWidth() - dw) / 2;
+                int dy = (getHeight() - dh) / 2; // ✅ FIXED
+
                 g2.drawImage(img, dx, dy, dw, dh, null);
                 g2.dispose();
             }

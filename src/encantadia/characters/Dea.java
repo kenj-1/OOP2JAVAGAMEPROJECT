@@ -29,6 +29,8 @@ public class Dea extends Character {
                         "only silence where once they carried guidance."
         );
 
+        this.element = Element.AIR;
+
         skills.add(new Skill("Wind Slash", 220, 300, 0,
                 Skill.SkillType.DAMAGE,
                 Skill.EffectType.NONE, 0, 0));

@@ -1,12 +1,18 @@
 package encantadia.gamemode;
 
 import encantadia.story.StoryType;
+import encantadia.audio.MusicType;
+import encantadia.audio.MusicManager;
+
+import javax.swing.*;
 
 public class PVEMode extends BaseModeScreen {
 
     private static final String BG_PATH = "/resources/background (2).png";
 
-    public PVEMode() { init(); }
+    public PVEMode() {
+        init();
+    }
 
     @Override protected String       getBackgroundPath() { return BG_PATH; }
     @Override protected String       getWindowTitle()    { return "Encantadia: Echoes of the Gem — PVE Mode"; }

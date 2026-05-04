@@ -1,12 +1,13 @@
 package encantadia.characters.animation;
 
+import encantadia.audio.SFXManager;
 import javax.swing.*;
 import java.awt.*;
 import java.net.URL;
 
 /**
  * CharacterAnimator
- * ENHANCED: Now features an integrated Kinetic Feedback (Knockback) system.
+ * ENHANCED: Integrated Kinetic Feedback (Knockback) & Elemental Audio Sync system.
  */
 public class CharacterAnimator {
 
@@ -15,15 +16,14 @@ public class CharacterAnimator {
     private final String   idlePath;
     private final String[] skillPaths;
     private final int[]    skillDurationsMs;
+    private String         sfxPath; // Holds the elemental audio path
 
     private ImageIcon currentIcon;
     private AnimState currentState = AnimState.IDLE;
     private Timer     revertTimer;
     private Timer     knockbackTimer;
 
-    // Kinetic offset dynamically polled by BattleCanvas
     private int       knockbackOffset = 0;
-
     private static final int REVERT_PADDING_MS = 120;
 
     public CharacterAnimator(String idlePath, String[] skillPaths, int[] skillDurationsMs) {
@@ -37,6 +37,9 @@ public class CharacterAnimator {
         cancelRevert();
         currentState = AnimState.IDLE;
         switchIcon(idlePath);
+
+        // Exact audio termination synchronized with the return to IDLE state
+        SFXManager.stopSkillSFX();
     }
 
     public void toSkill(int skillIndex) {
@@ -47,20 +50,20 @@ public class CharacterAnimator {
         currentState = AnimState.SKILL;
         switchIcon(path);
 
+        // Fire audio trigger simultaneously with the GIF execution
+        SFXManager.playSkillSFX(sfxPath);
+
         int displayMs = (skillDurationsMs != null && skillIndex < skillDurationsMs.length)
                 ? skillDurationsMs[skillIndex] + REVERT_PADDING_MS : 1600;
 
         revertTimer = new Timer(displayMs, e -> {
             ((Timer) e.getSource()).stop();
-            toIdle();
+            toIdle(); // This drops the GIF and cuts the audio simultaneously
         });
         revertTimer.setRepeats(false);
         revertTimer.start();
     }
 
-    /**
-     * Triggers a kinetic knockback effect that decays over time.
-     */
     public void triggerHit() {
         if (knockbackTimer != null) knockbackTimer.stop();
         knockbackOffset = 30; // Max pushback distance in pixels
@@ -104,6 +107,7 @@ public class CharacterAnimator {
             currentIcon.setImageObserver(null);
             currentIcon = null;
         }
+        SFXManager.stopSkillSFX();
     }
 
     public AnimState getState()  { return currentState; }
@@ -122,11 +126,31 @@ public class CharacterAnimator {
         if (revertTimer != null) { revertTimer.stop(); revertTimer = null; }
     }
 
+    /**
+     * Factory method handling Elemental Audio Asset Mapping and Memory Caching
+     */
     public static CharacterAnimator forCharacter(encantadia.characters.Character ch) {
+        if (ch == null) return null;
+
         String   idle      = ch.getIdleAnimationPath();
         String[] skills    = ch.getSkillAnimationPaths();
         int[]    durations = ch.getSkillAnimationDurations();
         if (idle == null && (skills == null || skills.length == 0)) return null;
-        return new CharacterAnimator(idle, skills, durations);
+
+        CharacterAnimator animator = new CharacterAnimator(idle, skills, durations);
+
+        // Dynamically map elemental audio files
+        switch (ch.getElement()) {
+            case FIRE:  animator.sfxPath = "/resources/fireSkill.wav";  break;
+            case WATER: animator.sfxPath = "/resources/waterSkill.wav"; break;
+            case EARTH: animator.sfxPath = "/resources/earthSkill.wav"; break;
+            case AIR:   animator.sfxPath = "/resources/airSkill.wav";   break;
+            default:    animator.sfxPath = null;
+        }
+
+        // Offload preload to a background thread to prevent latency spikes during battle initialization
+        SFXManager.preload(animator.sfxPath);
+
+        return animator;
     }
 }
